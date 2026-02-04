@@ -10,6 +10,7 @@ export default function DashboardPage() {
     const supabase = createClient()
     const { currentSpace } = useSpace()
 
+    const [loading, setLoading] = useState(true)
     const [counts, setCounts] = useState({
         files: 0,
         folders: 0,
@@ -20,38 +21,46 @@ export default function DashboardPage() {
     useEffect(() => {
         async function fetchCounts() {
             if (!currentSpace) return
+            // Don't set loading to true here to avoid flickering on space switch if not desired, 
+            // but usually good to reset. Let's keep it simple.
+            setLoading(true)
 
-            // 1. Files & Folders
-            const { count: filesCount } = await supabase
-                .from('files')
-                .select('*', { count: 'exact', head: true })
-                .eq('space_id', currentSpace.id)
-                .eq('type', 'file')
+            try {
+                // 1. Files & Folders
+                const { count: filesCount } = await supabase
+                    .from('files')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('space_id', currentSpace.id)
+                    .eq('type', 'file')
 
-            const { count: foldersCount } = await supabase
-                .from('files')
-                .select('*', { count: 'exact', head: true })
-                .eq('space_id', currentSpace.id)
-                .eq('type', 'folder')
+                const { count: foldersCount } = await supabase
+                    .from('files')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('space_id', currentSpace.id)
+                    .eq('type', 'folder')
 
-            // 2. Transcriptions & Quizzes (Filtered by Space)
-            // We use JSONB operators to query inside metadata/results columns as implemented in providers/pages
-            const { count: transcriptionsCount } = await supabase
-                .from('transcriptions')
-                .select('*', { count: 'exact', head: true })
-                .eq('metadata->>space_id', currentSpace.id)
+                // 2. Transcriptions & Quizzes (Filtered by Space)
+                const { count: transcriptionsCount } = await supabase
+                    .from('transcriptions')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('metadata->>space_id', currentSpace.id)
 
-            const { count: quizzesCount } = await supabase
-                .from('quizzes')
-                .select('*', { count: 'exact', head: true })
-                .eq('results->>space_id', currentSpace.id)
+                const { count: quizzesCount } = await supabase
+                    .from('quizzes')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('results->>space_id', currentSpace.id)
 
-            setCounts({
-                files: filesCount || 0,
-                folders: foldersCount || 0,
-                transcriptions: transcriptionsCount || 0,
-                quizzes: quizzesCount || 0
-            })
+                setCounts({
+                    files: filesCount || 0,
+                    folders: foldersCount || 0,
+                    transcriptions: transcriptionsCount || 0,
+                    quizzes: quizzesCount || 0
+                })
+            } catch (error) {
+                console.error("Error fetching stats:", error)
+            } finally {
+                setLoading(false)
+            }
         }
         fetchCounts()
     }, [currentSpace, supabase])
@@ -79,8 +88,12 @@ export default function DashboardPage() {
                             <stat.icon className={`h-4 w-4 ${stat.color}`} />
                         </CardHeader>
                         <CardContent className="p-4 pt-0">
-                            <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-                                {stat.value}
+                            <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 min-h-[32px] flex items-center">
+                                {loading ? (
+                                    <div className="h-6 w-12 bg-primary/10 animate-pulse rounded-md" />
+                                ) : (
+                                    stat.value
+                                )}
                             </div>
                         </CardContent>
                     </Card>

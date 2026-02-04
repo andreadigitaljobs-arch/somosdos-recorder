@@ -72,13 +72,34 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     }, [supabase, setSpaces, setCurrentSpace])
 
     useEffect(() => {
+        let mounted = true
+
         const init = async () => {
             setLoading(true)
-            await fetchSpaces()
-            setLoading(false)
+
+            // Check session first
+            const { data: { session } } = await supabase.auth.getSession()
+
+            if (session && mounted) {
+                await fetchSpaces()
+            }
+
+            // Listen for auth changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+                if (session && mounted) {
+                    await fetchSpaces()
+                }
+            })
+
+            if (mounted) setLoading(false)
+            return () => {
+                mounted = false
+                subscription.unsubscribe()
+            }
         }
+
         init()
-    }, [fetchSpaces])
+    }, [supabase, fetchSpaces])
 
     const handleSelectSpace = (space: Space | null) => {
         setCurrentSpace(space)

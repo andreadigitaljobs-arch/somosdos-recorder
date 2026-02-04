@@ -4,10 +4,19 @@ import { useState, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Image as ImageIcon, Sparkles, RefreshCw, Trash, Brain } from "lucide-react"
+import { Image as ImageIcon, Sparkles, RefreshCw, Trash, Brain, Pencil, Check, X, FileText } from "lucide-react"
 import { motion } from "framer-motion"
 import { useSpace } from "@/components/providers/space-provider"
 import { createBrowserClient } from "@supabase/ssr"
+import { FormattedText } from "@/components/formatted-text"
+
+// UI Types
+type QuestionResult = {
+    q: string;
+    a: string;
+    shortAnswer?: string;
+    source?: string;
+}
 
 export default function QuizPage() {
     const supabase = createBrowserClient(
@@ -16,9 +25,14 @@ export default function QuizPage() {
     )
     const [images, setImages] = useState<File[]>([])
     const [context, setContext] = useState("")
-    const [results, setResults] = useState<any[]>([])
+    const [results, setResults] = useState<QuestionResult[]>([])
     const [loading, setLoading] = useState(false)
+    const [progress, setProgress] = useState(0)
+    const [loadingMessage, setLoadingMessage] = useState("Iniciando...")
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
+    const [currentQuizId, setCurrentQuizId] = useState<string | null>(null)
+    const [editingIndex, setEditingIndex] = useState<number | null>(null)
+    const [editValue, setEditValue] = useState("")
     const { currentSpace } = useSpace()
 
     // Reset state when space changes
@@ -26,7 +40,37 @@ export default function QuizPage() {
         setImages([])
         setContext("")
         setResults([])
+        setProgress(0)
     }, [currentSpace])
+
+    // Progress Simulation
+    useEffect(() => {
+        let interval: NodeJS.Timeout
+        if (loading) {
+            setProgress(0)
+            setLoadingMessage("Conectando con Deep Search...")
+
+            let p = 0
+            interval = setInterval(() => {
+                p += Math.random() * 5 // Random increment
+                if (p > 90) p = 90 // Cap at 90% until done
+
+                setProgress(Math.floor(p))
+
+                // Dynamic messages based on progress
+                if (p < 30) setLoadingMessage("Buscando en tu biblioteca...")
+                else if (p < 60) setLoadingMessage("Leyendo documentos relevantes...")
+                else if (p < 80) setLoadingMessage("Analizando con IA...")
+                else setLoadingMessage("Redactando preguntas...")
+
+            }, 500) // Update every 500ms
+        } else {
+            setProgress(100)
+            setTimeout(() => setProgress(0), 1000) // Hide after 1s
+        }
+
+        return () => clearInterval(interval)
+    }, [loading])
 
     // Handle paste from clipboard
     useEffect(() => {
@@ -109,22 +153,42 @@ export default function QuizPage() {
             if (!response.ok) throw new Error(data.error || "Error en el servidor")
 
             setResults(data.results)
+            setLoading(false) // UNBLOCK UI IMMEDIATELY
 
-            // Save to Supabase for Analytics/History
+            // Save to Supabase for Analytics/History (Non-blocking)
             if (session.user) {
-                await supabase.from('quizzes').insert({
+                // Fire and forget (or handle silently)
+                supabase.from('quizzes').insert({
                     user_id: session.user.id,
                     title: context ? `Quiz: ${context.substring(0, 30)}...` : `Quiz Generado - ${new Date().toLocaleDateString()}`,
                     questions: data.results,
-                    results: { space_id: currentSpace.id } // Storing space_id for analytics filtering
+                    results: { space_id: currentSpace.id }
+                }).then(({ error }) => {
+                    if (error) console.error("Error saving history:", error)
                 })
             }
 
         } catch (error: any) {
             console.error(error)
             setResults([{ q: "Error", a: error.message || "No se pudo generar el quiz." }])
-        } finally {
             setLoading(false)
+        }
+    }
+
+    const handleSaveEdit = async (index: number) => {
+        const newResults = [...results]
+        newResults[index].a = editValue
+        setResults(newResults)
+        setEditingIndex(null)
+
+        // Persist to DB if we have an ID
+        if (currentQuizId) {
+            const { error } = await supabase
+                .from('quizzes')
+                .update({ questions: newResults })
+                .eq('id', currentQuizId)
+
+            if (error) console.error("Error updating quiz:", error)
         }
     }
 
@@ -186,14 +250,33 @@ export default function QuizPage() {
                             )}
                         </div>
 
-                        <Button
-                            onClick={handleSolve}
-                            disabled={loading || (images.length === 0 && !context)}
-                            className="w-full bg-gradient-to-r from-primary to-secondary text-white font-semibold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
-                        >
-                            {loading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                            {loading ? "Analizando..." : "Resolver Quiz con IA"}
-                        </Button>
+
+                        <div className="space-y-2">
+                            {loading ? (
+                                <div className="space-y-2">
+                                    <div className="h-9 w-full bg-secondary/20 rounded-md overflow-hidden relative border border-secondary/10">
+                                        <motion.div
+                                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary/80 to-primary"
+                                            initial={{ width: "0%" }}
+                                            animate={{ width: `${progress}%` }}
+                                            transition={{ ease: "linear" }}
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-foreground/80 z-10">
+                                            {progress}% - {loadingMessage}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <Button
+                                    onClick={handleSolve}
+                                    disabled={loading || (images.length === 0 && !context)}
+                                    className="w-full bg-gradient-to-r from-primary to-secondary text-white font-semibold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+                                >
+                                    <Sparkles className="h-4 w-4 mr-2" />
+                                    Resolver Quiz con IA
+                                </Button>
+                            )}
+                        </div>
                     </Card>
                 </div>
 
@@ -214,16 +297,66 @@ export default function QuizPage() {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: i * 0.1 }}
                                 >
-                                    <Card className="p-4 border-l-4 border-l-primary bg-card/80 backdrop-blur-sm">
+                                    <Card className="p-4 border-l-4 border-l-primary bg-card/80 backdrop-blur-sm group relative">
                                         <div className="flex items-start gap-3">
                                             <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">
                                                 {i + 1}
                                             </span>
-                                            <div className="space-y-2 w-full">
+                                            <div className="space-y-2 w-full pr-8">
                                                 <p className="text-sm font-semibold">{res.q}</p>
-                                                <div className="bg-secondary/10 p-3 rounded-lg border border-secondary/20">
-                                                    <p className="text-sm text-foreground/90 leading-relaxed">{res.a}</p>
-                                                </div>
+
+                                                {editingIndex === i ? (
+                                                    <div className="space-y-2">
+                                                        <textarea
+                                                            value={editValue}
+                                                            onChange={(e) => setEditValue(e.target.value)}
+                                                            className="w-full min-h-[80px] p-2 rounded-md border border-primary/50 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex gap-2 justify-end">
+                                                            <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => setEditingIndex(null)}>
+                                                                <X className="h-4 w-4 mr-1" /> Cancelar
+                                                            </Button>
+                                                            <Button size="sm" className="h-7 px-2" onClick={() => handleSaveEdit(i)}>
+                                                                <Check className="h-4 w-4 mr-1" /> Guardar
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-secondary/10 p-3 rounded-lg border border-secondary/20 relative group/answer">
+                                                        {/* Short Answer Badge */}
+                                                        {res.shortAnswer && (
+                                                            <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-secondary/20 justify-between">
+                                                                <div className="flex gap-2 flex-wrap">
+                                                                    {res.shortAnswer.split(',').map((ans: string, idx: number) => (
+                                                                        <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground shadow-sm">
+                                                                            ✓ {ans.trim()}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                {/* Source Attribution */}
+                                                                {res.source && (
+                                                                    <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 bg-background/50 px-2 py-1 rounded-md border border-border/30">
+                                                                        <FileText className="h-3 w-3" />
+                                                                        Fuente: {res.source}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {/* Long Answer with FormattedText */}
+                                                        <FormattedText text={res.a} />
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingIndex(i)
+                                                                setEditValue(res.a)
+                                                            }}
+                                                            className="absolute top-2 right-2 p-1 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded transition-all opacity-0 group-hover/answer:opacity-100"
+                                                            title="Editar respuesta"
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </Card>
@@ -236,6 +369,7 @@ export default function QuizPage() {
                                     setResults([])
                                     setImages([])
                                     setContext("")
+                                    setCurrentQuizId(null)
                                 }}
                             >
                                 Limpiar Todo
@@ -255,16 +389,13 @@ export default function QuizPage() {
                         className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
                         onClick={() => setSelectedImageIndex(null)}
                     >
-                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <X className="h-6 w-6" />
                     </button>
                     <div className="max-w-6xl max-h-[90vh] w-full h-full flex items-center justify-center">
                         <img
                             src={URL.createObjectURL(images[selectedImageIndex])}
-                            alt="Vista completa"
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                            onClick={(e) => e.stopPropagation()}
+                            alt="full size"
+                            className="max-w-full max-h-full object-contain"
                         />
                     </div>
                 </div>

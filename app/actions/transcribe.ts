@@ -3,41 +3,69 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { writeFile, unlink } from "fs/promises";
+import { createWriteStream } from "fs";
+import { Readable } from "stream";
+import { finished } from "stream/promises";
 import path from "path";
 import os from "os";
 
-export async function transcribeAudio(formData: FormData) {
+// Types
+type TranscribeParams = {
+    fileUrl: string;
+    apiKey: string;
+    prompt?: string;
+    mimeType: string;
+    originalName: string;
+}
+
+export async function transcribeAudio(params: TranscribeParams) {
     let tempFilePath = "";
 
-    try {
-        const file = formData.get("file") as File;
-        const apiKey = formData.get("apiKey") as string;
-        const prompt = formData.get("prompt") as string || "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
+    // Validate Input
+    if (!params.fileUrl || !params.apiKey) {
+        return { error: "File URL and API Key are required." };
+    }
 
-        if (!file || !apiKey) {
-            return { error: "File and API Key are required." };
-        }
+    try {
+        const { fileUrl, apiKey, mimeType, originalName } = params;
+        const prompt = params.prompt || "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
 
         // Initialize Gemini Clients
         const genAI = new GoogleGenerativeAI(apiKey);
         const fileManager = new GoogleAIFileManager(apiKey);
 
-        // Save file temporarily to disk (GoogleAIFileManager requires a path)
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+        // Fetch file from Supabase (or any URL)
+        console.log("Fetching file from URL:", fileUrl);
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
 
         // Create a safe temp filename
         const tempDir = os.tmpdir();
-        const fileName = `upload-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+        const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
+        const fileName = `upload-${Date.now()}-${safeName}`;
         tempFilePath = path.join(tempDir, fileName);
 
-        await writeFile(tempFilePath, buffer);
+        // Stream to disk to avoid memory issues with large files
+        const fileStream = createWriteStream(tempFilePath);
+        // @ts-ignore: Readable.fromWeb is available in Node 18+ (Vercel default)
+        await finished(Readable.fromWeb(fileResponse.body).pipe(fileStream));
         console.log("File saved to temp:", tempFilePath);
+
+        // Determine MimeType (Fallback to extension if missing or generic)
+        let finalMimeType = mimeType;
+        if (!finalMimeType || finalMimeType === 'application/octet-stream') {
+            const ext = path.extname(safeName).toLowerCase();
+            if (ext === '.mp3') finalMimeType = 'audio/mp3';
+            else if (ext === '.wav') finalMimeType = 'audio/wav';
+            else if (ext === '.m4a') finalMimeType = 'audio/m4a';
+            else if (ext === '.mp4') finalMimeType = 'video/mp4';
+            else if (ext === '.mov') finalMimeType = 'video/quicktime';
+        }
 
         // 1. Upload to Gemini
         const uploadResponse = await fileManager.uploadFile(tempFilePath, {
-            mimeType: file.type || "video/mp4",
-            displayName: file.name,
+            mimeType: finalMimeType || "video/mp4",
+            displayName: originalName,
         });
         console.log("Uploaded to Gemini:", uploadResponse.file.uri);
 

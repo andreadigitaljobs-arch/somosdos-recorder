@@ -33,12 +33,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
-    const [apiKey, setApiKey] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem("gemini_api_key") || ""
-        }
-        return ""
-    })
+
     const [email, setEmail] = useState("usuario@demo.com")
     const { spaces, currentSpace, setCurrentSpace, refreshSpaces } = useSpace()
     const router = useRouter()
@@ -103,10 +98,7 @@ export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
         getUser()
     }, [supabase])
 
-    const handleSaveKey = (val: string) => {
-        setApiKey(val)
-        localStorage.setItem("gemini_api_key", val)
-    }
+
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
@@ -146,23 +138,7 @@ export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
                     </p>
                 </div>
 
-                {/* API Key */}
-                <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                        <Key className="h-4 w-4" />
-                        <span className="text-xs font-medium uppercase tracking-wider">Gemini API Key</span>
-                    </div>
-                    <Input
-                        type="password"
-                        placeholder="AIza..."
-                        value={apiKey}
-                        onChange={(e) => handleSaveKey(e.target.value)}
-                        className="text-xs"
-                    />
-                    <p className="text-[10px] text-muted-foreground">
-                        Se guarda localmente en tu dispositivo.
-                    </p>
-                </div>
+
 
                 {/* Spaces */}
                 <div className="space-y-3">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft } from "lucide-react"
+import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft, Copy, Check, Brain } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +19,7 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { SmartFileViewer } from "@/components/smart-file-viewer"
 
 
 // Types
@@ -29,6 +30,7 @@ type FileSystemItem = {
     parentId: string | null
     size?: string
     storagePath?: string
+    tags?: string[]
 }
 
 export default function LibraryPage() {
@@ -71,6 +73,9 @@ export default function LibraryPage() {
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
     }
 
+    const [availableTags, setAvailableTags] = useState<string[]>([])
+    const [selectedTag, setSelectedTag] = useState<string>("all")
+
     // --- Fetching ---
     const fetchFiles = useCallback(async () => {
         if (!currentSpace) return
@@ -79,9 +84,16 @@ export default function LibraryPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
+        // Fetch Files with Tags
+        // Note: Make sure RLS Policies allow reading tags
         const { data, error } = await supabase
             .from('files')
-            .select('*')
+            .select(`
+                *,
+                file_tags (
+                    tags (name)
+                )
+            `)
             .eq('user_id', user.id)
             .eq('space_id', currentSpace.id)
             .order('type', { ascending: false })
@@ -98,8 +110,13 @@ export default function LibraryPage() {
                 parentId: f.parent_id,
                 storagePath: f.storage_path,
                 size: f.size_bytes ? formatBytes(f.size_bytes) : undefined,
+                tags: f.file_tags?.map((ft: any) => ft.tags?.name).filter(Boolean) || []
             }))
             setItems(mappedItems)
+
+            // Extract unique tags for filter
+            const allTags = Array.from(new Set(mappedItems.flatMap(i => i.tags || []))).sort()
+            setAvailableTags(allTags)
         }
         setLoading(false)
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,6 +127,7 @@ export default function LibraryPage() {
             fetchFiles()
         } else {
             setItems([])
+            setAvailableTags([])
         }
     }, [fetchFiles, currentSpace])
 
@@ -169,11 +187,28 @@ export default function LibraryPage() {
     }
 
     // --- Filtering ---
+    // --- Filtering ---
     const filteredItems = items.filter(item => {
-        if (searchQuery) {
-            return item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesSearch = searchQuery ? item.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
+        const matchesFolder = item.parentId === currentFolderId
+
+        // Tag Filter Logic
+        // If searching, ignore folder hierarchy (show flat results). If browsing folders, respect hierarchy.
+        // BUT if filtering by tag, show ALL files with that tag regardless of folder? Usually yes.
+        const matchesTag = selectedTag === "all" || (item.tags && item.tags.includes(selectedTag))
+
+        if (selectedTag !== "all") {
+            // Tag mode: Flat list of matches
+            return matchesTag && matchesSearch
         }
-        return item.parentId === currentFolderId
+
+        if (searchQuery) {
+            // Search mode: Flat list
+            return matchesSearch
+        }
+
+        // Folder mode
+        return matchesFolder
     })
 
     // --- Actions ---
@@ -262,6 +297,41 @@ export default function LibraryPage() {
         setIsRenameOpen(true)
     }
 
+    const handleCopy = async (item: FileSystemItem) => {
+        try {
+            // First fetch content if not cached (reusing similar logic to preview)
+            // Ideally we should have a cleaner way to fetch content, but for now we download it
+            const { data, error } = await supabase.storage
+                .from('library_files')
+                .download(item.storagePath!)
+
+            if (error) throw error
+
+            const text = await data.text()
+
+            // Clean text logic
+            const cleanText = text
+                .replace(/^#+\s/gm, '') // Remove headers markdown
+                .replace(/(\*\*|__)(.*?)\1/g, '$2') // Remove bold
+                .replace(/(\*|_)(.*?)\1/g, '$2') // Remove italic
+                .replace(/`{3,}[\s\S]*?`{3,}/g, '') // Remove code blocks
+                .replace(/`(.+?)`/g, '$1') // Remove inline code
+                .replace(/^[-*+]\s/gm, '') // Remove list bullets
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1') // Remove links, keep text
+                .replace(/\n{3,}/g, '\n\n') // Normalize newlines
+                .trim()
+
+            await navigator.clipboard.writeText(cleanText)
+
+            // Simple visual feedback could be improved with a toast
+            alert("Texto copiado al portapapeles (limpio de formatos)")
+
+        } catch (error) {
+            console.error("Error al copiar:", error)
+            alert("No se pudo copiar el contenido")
+        }
+    }
+
     const confirmRename = async () => {
         if (!itemToRename || !newName) return
         const { error } = await supabase.from('files').update({ name: newName }).eq('id', itemToRename.id)
@@ -313,6 +383,27 @@ export default function LibraryPage() {
             setPreviewContent("No se pudo cargar la vista previa. Puede que no sea un archivo de texto.\n\n" + e.message)
         } finally {
             setIsLoadingPreview(false)
+        }
+    }
+
+    // --- AI Analysis ---
+    const handleAnalyze = async (item: FileSystemItem) => {
+        if (item.type !== 'file') return
+        if (!confirm(`¿Iniciar análisis estructural con IA para "${item.name}"? Esto sucederá en segundo plano.`)) return
+
+        try {
+            const res = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileId: item.id })
+            })
+
+            if (!res.ok) throw new Error("Error en el servicio de análisis")
+
+            alert("✅ Análisis completado. Los metadatos (marcadores, segmentos, etiquetas) se han guardado en la base de datos.")
+        } catch (e: any) {
+            console.error(e)
+            alert("Error al analizar: " + e.message)
         }
     }
 
@@ -519,9 +610,22 @@ export default function LibraryPage() {
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openRename(item) }}>
                                             <Pencil className="h-4 w-4 mr-2" /> Renombrar
                                         </DropdownMenuItem>
+                                        {item.type === 'file' && (
+                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopy(item) }}>
+                                                <Copy className="h-4 w-4 mr-2" /> Copiar Contenido
+                                            </DropdownMenuItem>
+                                        )}
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMove(item) }}>
                                             <FolderInput className="h-4 w-4 mr-2" /> Mover
                                         </DropdownMenuItem>
+                                        {item.type === 'file' && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAnalyze(item) }}>
+                                                    <Brain className="h-4 w-4 mr-2 text-purple-500" /> Analizar Estructura (IA)
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(item) }}>
                                             <Trash2 className="h-4 w-4 mr-2" /> Eliminar
@@ -584,39 +688,13 @@ export default function LibraryPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Preview Modal */}
-            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-                <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>{previewItem?.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex-1 overflow-y-auto min-h-[300px] bg-muted/20 p-4 rounded text-sm font-mono whitespace-pre-wrap border relative">
-                        <AnimatePresence mode="wait">
-                            {isLoadingPreview ? (
-                                <motion.div
-                                    key="loading"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="absolute inset-0 flex items-center justify-center"
-                                >
-                                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="content"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 1.2, ease: "easeOut" }}
-                                    className="h-full"
-                                >
-                                    {previewContent}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* Smart File Viewer (Replaces old Preview) */}
+            <SmartFileViewer
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                fileId={previewItem?.id || ""}
+                fileName={previewItem?.name || ""}
+            />
         </div>
     )
 }

@@ -3,6 +3,7 @@
 import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TopNav } from "./top-nav"
+import { SettingsDialog } from "@/components/settings-dialog"
 
 export function DashboardHeader({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     return (
@@ -13,6 +14,9 @@ export function DashboardHeader({ onOpenSidebar }: { onOpenSidebar: () => void }
                 </Button>
                 <div className="flex-1 min-w-0">
                     <TopNav />
+                </div>
+                <div className="flex items-center gap-2">
+                    <SettingsDialog />
                 </div>
             </div>
         </header>

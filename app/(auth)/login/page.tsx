@@ -52,13 +52,13 @@ export default function LoginPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="z-10 w-full max-w-md"
+                className="z-10 w-full max-w-[380px]"
             >
                 <Card className="border-border/50 bg-card/50 backdrop-blur-xl">
-                    <CardHeader className="space-y-1 text-center">
-                        <CardTitle className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                            E-Education
-                        </CardTitle>
+                    <CardHeader className="space-y-4 text-center py-8">
+                        <div className="flex justify-center mb-6">
+                            <img src="/logo_text.png" alt="E-Education" className="h-10 object-contain" />
+                        </div>
                         <CardDescription>
                             Ingresa a tu espacio de estudio profesional
                         </CardDescription>
@@ -92,7 +92,7 @@ export default function LoginPage() {
                                 />
                             </div>
                         </CardContent>
-                        <CardFooter>
+                        <CardFooter className="pb-8">
                             <Button type="submit" className="w-full h-12 text-md font-semibold bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity shadow-lg shadow-primary/20" disabled={loading}>
                                 {loading ? "Ingresando..." : "Iniciar Sesión"}
                             </Button>

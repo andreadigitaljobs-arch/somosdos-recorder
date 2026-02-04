@@ -33,30 +33,33 @@ export async function POST(req: NextRequest) {
         });
 
         // 2. Fetch relevant files context
-        // Query files in this space. For simplicity, we'll fetch text files.
-        // In a real app, you'd use RAG (Embeddings), but for now we'll naively fetch recent text files.
-        const { data: files, error: dbError } = await supabase
+        // DEEP SEARCH: Fetch metadata for last 1000 files to find all relevant text/pdfs in the library
+        const { data: filesMeta, error: dbError } = await supabase
             .from('files')
-            .select('name, storage_path')
+            .select('name, storage_path, created_at')
             .eq('space_id', spaceId)
             .eq('type', 'file')
-            .not('storage_path', 'is', null) // Ensure paths exist
-            .limit(5); // Limit context to avoid token limits for this demo
+            .not('storage_path', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1000);
 
         if (dbError) throw dbError;
 
         let contextText = "";
-        if (files && files.length > 0) {
-            console.log(`Found ${files.length} files for context.`);
+        const pdfParts: any[] = [];
 
-            // Download content for each file
-            const filePromises = files.map(async (f) => {
-                if (!f.storage_path) return "";
+        if (filesMeta && filesMeta.length > 0) {
+            // Filter for supported types (Text & PDF)
+            const supportedFiles = filesMeta.filter(f =>
+                f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
+            ).slice(0, 8); // REVERT: Restore 8 files for better context coverage
 
-                // Only try to read text-ish files to avoid binary garbage
-                // Ideally backend checks mime type, here we check extension
-                const isText = f.name.match(/\.(txt|md|csv|json|js|ts|py|html)$/i);
-                if (!isText) return `[File: ${f.name} - Skipped (Not text)]`;
+            console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
+
+            const filePromises = supportedFiles.map(async (f) => {
+                if (!f.storage_path) return;
+
+                const isPdf = f.name.match(/\.pdf$/i);
 
                 const { data, error } = await supabase.storage
                     .from('library_files')
@@ -64,30 +67,46 @@ export async function POST(req: NextRequest) {
 
                 if (error) {
                     console.error(`Error downloading ${f.name}:`, error);
-                    return "";
+                    return;
                 }
 
-                const text = await data.text();
-                return `--- FILE: ${f.name} ---\n${text.slice(0, 5000)}\n--- END FILE ---\n`; // Truncate individual files
+                if (isPdf) {
+                    // Convert PDF to Base64 for Gemini
+                    const arrayBuffer = await data.arrayBuffer();
+                    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+                    pdfParts.push({
+                        inline_data: {
+                            mime_type: "application/pdf",
+                            data: base64Data
+                        }
+                    });
+                    console.log(`Added PDF context: ${f.name}`);
+                } else {
+                    // Handle Text
+                    const text = await data.text();
+                    // OPTIMIZATION: Reduce from 10k to 6k chars per file for faster processing
+                    contextText += `--- FILE: ${f.name} ---\n${text.slice(0, 6000)}\n--- END FILE ---\n`;
+                }
             });
 
-            const fileContents = await Promise.all(filePromises);
-            contextText = fileContents.join("\n");
+            await Promise.all(filePromises);
         } else {
             contextText = "No files found in library.";
         }
 
-        // 3. Setup Gemini & Model Fallback Strategy
+        // 3. Setup Gemini
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // 4. Construct Prompt
         const systemPrompt = `
 You are an advanced AI Tutor for the E-Education platform.
-Your goal is to answer questions or generate quiz content based PRIMARILY on the provided Context Files.
+Your goal is to answer questions or generate quiz content based PRIMARILY on the provided Context Files (Text and PDFs).
 If the context doesn't contain the answer, use your general knowledge but mention that it's not in the files.
 
-CONTEXT FILES:
+CONTEXT SUMMARY (Text Files):
 ${contextText}
+
+(Note: PDF files are attached as separate inputs for you to read)
 
 USER PROMPT:
 ${prompt}
@@ -95,17 +114,41 @@ ${prompt}
 INSTRUCTIONS:
 - Generate 1-3 distinct questions/answers pairs if the user asks for a quiz.
 - If the user asks a specific question, answer it directly.
+- **CRITICAL: DETERMINE THE ANSWER**
+  1. **VISUAL CHECK**: Does the image explicitly show the correct answer (e.g., a green checkmark, a circle, or a "Correct" label)?
+     - IF YES: Use that as the correct option.
+     - IF NO (Unsolved Question): **SOLVE IT** using the provided Context Files. Analyze the question text and find the matching concept in the documents.
+  2. **OPTION MAPPING**:
+     - Map options A, B, C, D to 1, 2, 3, 4.
+     - If no labels, count the position (Top = 1).
+  3. **VERIFICATION**:
+     - Ensure the selected option matches the content found in your "Deep Search" of the library.
+- For each question, provide:
+  * A SHORT ANSWER: The specific option identifier, e.g., "Opción 1" or "Opción B".
+  * A LONG ANSWER: Full explanation. **Use bullet points and escaped line breaks (\\n) for formatting.** Do NOT use literal newlines inside strings.
+  * THE SOURCE: The exact name of the file(s) where this information was found (e.g., "Marketing_Chapter_1.pdf").
+  * IF THE INFO COMES FROM THE IMAGE ONLY: Use "Imagen proporcionada". 
+  * NEVER return technical error messages like "Not available" or "Derived from image". Only "Imagen proporcionada".
 - Return the response in this specific JSON format (WITHOUT markdown formatting):
 [
-  { "q": "Question 1", "a": "Answer 1" },
-  { "q": "Question 2", "a": "Answer 2" }
+  { 
+    "q": "Question 1", 
+    "shortAnswer": "Opción 2",
+    "a": "Detailed explanation of why Option 2 is correct...\n\n- Point 1\n- Point 2",
+    "source": "Marketing_Chapter_1.pdf"
+  }
 ]
 `;
 
         // 5. Generate
         let parts: any[] = [{ text: systemPrompt }];
 
-        // If frontend sends images (base64), add them here:
+        // Add PDFs (Context)
+        if (pdfParts.length > 0) {
+            parts = [...parts, ...pdfParts];
+        }
+
+        // Add User Images (Question)
         if (images && Array.isArray(images)) {
             images.forEach((img: any) => {
                 parts.push(img);
@@ -155,12 +198,25 @@ INSTRUCTIONS:
         let parsedParams = [];
         try {
             // Clean markdown blocks if Gemini adds them
-            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            let cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            // ROBUST PARSING: Find the first '[' and last ']' to ignore conversational intros
+            const firstBracket = cleanText.indexOf('[');
+            const lastBracket = cleanText.lastIndexOf(']');
+
+            if (firstBracket !== -1 && lastBracket !== -1) {
+                cleanText = cleanText.substring(firstBracket, lastBracket + 1);
+            }
+
             parsedParams = JSON.parse(cleanText);
         } catch (e) {
             console.error("Failed to parse JSON:", responseText);
             // Fallback
-            parsedParams = [{ q: "Error parsing AI response", a: responseText }];
+            parsedParams = [{ q: "Error parsing AI response", a: responseText.substring(0, 500) }];
+        }
+
+        if (!parsedParams || parsedParams.length === 0) {
+            parsedParams = [{ q: "Sin resultados", a: "La IA no encontró información relevante en los archivos analizados (Top 8). Intenta subir más contexto o ser más específico." }];
         }
 
         return NextResponse.json({ results: parsedParams });

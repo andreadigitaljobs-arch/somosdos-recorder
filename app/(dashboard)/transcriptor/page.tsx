@@ -229,7 +229,16 @@ export default function TranscriptorPage() {
                                             <p className="font-medium text-sm truncate">{item.file.name}</p>
                                             <div className="flex justify-between text-xs text-muted-foreground mt-1">
                                                 <span>{(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
-                                                {item.status === 'processing' && <span>{item.progress}%</span>}
+                                                {item.status === 'processing' && (
+                                                    <span className="flex items-center gap-2">
+                                                        <span>{Math.round(item.progress)}%</span>
+                                                        {item.statusMessage && (
+                                                            <span className="hidden sm:inline-block text-primary/80 animate-pulse truncate max-w-[300px] md:max-w-[400px]">
+                                                                {item.statusMessage}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                )}
                                                 {item.status === 'error' && <span className="text-red-400 truncate max-w-[150px]">{item.error}</span>}
                                             </div>
                                             {/* Progress Bar */}
