@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft, Copy, Check, Brain } from "lucide-react"
+import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft, Copy, Check, Brain, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
@@ -494,6 +495,20 @@ export default function LibraryPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Tag Filter */}
+                    <Select value={selectedTag} onValueChange={setSelectedTag}>
+                        <SelectTrigger className="w-[180px] h-9">
+                            <Tag className="h-4 w-4 mr-2 text-muted-foreground" />
+                            <SelectValue placeholder="Etiquetas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas las etiquetas</SelectItem>
+                            {availableTags.map(tag => (
+                                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -508,7 +523,7 @@ export default function LibraryPage() {
 
             {/* Breadcrumbs & Stats */}
             <div className="border-b pb-2">
-                {!searchQuery ? (
+                {!searchQuery && selectedTag === 'all' ? (
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
                         {/* Línea 1: Breadcrumb with horizontal scroll on mobile */}
                         <div className="flex items-center gap-1 text-sm text-muted-foreground overflow-x-auto scrollbar-hide">
@@ -538,7 +553,9 @@ export default function LibraryPage() {
                     </div>
                 ) : (
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
-                        <div className="text-sm text-muted-foreground">Resultados de búsqueda</div>
+                        <div className="text-sm text-muted-foreground">
+                            {selectedTag !== 'all' ? `Filtrado por: ${selectedTag}` : "Resultados de búsqueda"}
+                        </div>
                         <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3">
                             <span>{currentViewStats.folders} carpetas</span>
                             <span className="opacity-50">•</span>
@@ -556,7 +573,7 @@ export default function LibraryPage() {
                     {!loading && filteredItems.length === 0 && (
                         <div className="col-span-full py-12 flex flex-col items-center text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
                             <Folder className="h-10 w-10 mb-2 opacity-20" />
-                            <p>Carpeta vacía</p>
+                            <p>Carpeta vacía (o sin resultados)</p>
                         </div>
                     )}
 
@@ -569,7 +586,7 @@ export default function LibraryPage() {
                                 className="group relative flex flex-col items-center p-3 rounded-lg border bg-card hover:bg-accent/50 transition-all cursor-pointer aspect-square"
                                 onClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
                             >
-                                <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105">
+                                <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105 relative">
                                     {item.type === "folder" ? (
                                         <div className="relative">
                                             <Folder className="h-12 w-12 text-yellow-500 fill-yellow-500/20" />
@@ -580,7 +597,24 @@ export default function LibraryPage() {
                                             )}
                                         </div>
                                     ) : (
-                                        <FileText className="h-12 w-12 text-primary fill-primary/10" />
+                                        <div className="relative">
+                                            <FileText className="h-12 w-12 text-primary fill-primary/10" />
+                                            {/* Badge Overlay */}
+                                            {item.tags && item.tags.length > 0 && (
+                                                <div className="absolute -top-2 -right-3 flex flex-col items-end gap-0.5">
+                                                    {item.tags.slice(0, 1).map(tag => (
+                                                        <Badge key={tag} className="text-[9px] px-1 h-4 bg-purple-500/80 hover:bg-purple-500 whitespace-nowrap overflow-hidden max-w-[80px] text-ellipsis">
+                                                            {tag}
+                                                        </Badge>
+                                                    ))}
+                                                    {item.tags.length > 1 && (
+                                                        <Badge variant="secondary" className="text-[8px] px-1 h-3 opacity-80">
+                                                            +{item.tags.length - 1}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                                 <div className="w-full text-center mt-2 space-y-0.5">
