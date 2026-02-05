@@ -293,7 +293,7 @@ export default function TranscriptorPage() {
                         initial={{ opacity: 0, y: -20, x: "50%" }}
                         animate={{ opacity: 1, y: 0, x: "50%" }}
                         exit={{ opacity: 0, y: -20, x: "50%" }}
-                        className="fixed top-6 right-1/2 translate-x-1/2 md:right-8 md:translate-x-0 z-[100] bg-emerald-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md bg-opacity-95 border border-emerald-400/50"
+                        className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md bg-opacity-95 border border-emerald-400/50"
                     >
                         <div className="bg-white/20 p-1 rounded-full">
                             <CheckCircle className="h-4 w-4 text-white" />
