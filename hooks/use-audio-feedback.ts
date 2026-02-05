@@ -18,14 +18,14 @@ export function useAudioFeedback() {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(880, ctx.currentTime);
                 osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime); // INCREASED VOLUME (0.1 -> 0.3)
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.6);
             } else if (type === 'start') {
                 // Short "Blip" (Process started)
                 osc.frequency.setValueAtTime(440, ctx.currentTime);
-                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.setValueAtTime(0.2, ctx.currentTime); // INCREASED VOLUME (0.05 -> 0.2)
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.2);
@@ -34,7 +34,7 @@ export function useAudioFeedback() {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(110, ctx.currentTime);
                 osc.frequency.linearRampToValueAtTime(55, ctx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime); // INCREASED VOLUME (0.1 -> 0.4)
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.3);
