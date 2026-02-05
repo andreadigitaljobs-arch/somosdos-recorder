@@ -126,6 +126,7 @@ ${prompt}
 
 INSTRUCTIONS:
 - **QUANTITY:** Generate exactly ONE question/answer pair FOR EACH image provided. If the user provided 5 images, you MUST return 5 questions.
+- **LANGUAGE:** ANSWER ONLY IN SPANISH. Start the response in Spanish and do not switch to English.
 - If the user asks a specific question, answer it directly.
 - **CRITICAL: DETERMINE THE ANSWER**
   1. **VISUAL CHECK**: Does the image explicitly show the correct answer (e.g., a green checkmark, a circle, or a "Correct" label)?
@@ -138,7 +139,7 @@ INSTRUCTIONS:
      - Ensure the selected option matches the content found in your "Deep Search" of the library.
 - For each question, provide:
   * A SHORT ANSWER: The specific option identifier, e.g., "Opción 1" or "Opción B".
-  * A LONG ANSWER: Full explanation. **do NOT use asterisks (*). Use clean dashes (-) for lists or write in paragraphs.** Escaped newlines (\\n) are allowed.
+  * A LONG ANSWER: Full explanation in SPANISH. **Write in clear, cohesive paragraphs. Avoid using bullet points/lists/symbols if possible.** Do not use markdown (no * or #).
   * THE SOURCE: The exact name of the file(s) where this information was found (e.g., "Marketing_Chapter_1.pdf").
   * IF THE ANSWER IS NOT IN THE FILES: Use "Conocimiento General de IA". **NEVER use "Imagen proporcionada" - the user knows they provided the image.**
   * NEVER return technical error messages like "Not available" or "Derived from image".
