@@ -107,7 +107,10 @@ export async function transcribeAudio(params: TranscribeParams) {
         // Gemini 1.5 Flash is the most stable and generous tier currently
         const modelsToTry = [
             "gemini-1.5-flash",
-            "gemini-1.5-pro"
+            "gemini-1.5-flash-001",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-pro-001"
         ];
 
         let lastError = null;
