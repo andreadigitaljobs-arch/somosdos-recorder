@@ -32,6 +32,11 @@ export default function TranscriptorPage() {
     const [toastStatus, setToastStatus] = useState<'loading' | 'success' | 'error'>('loading')
     const [toastMessage, setToastMessage] = useState("")
 
+    // Connection Status State
+    const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
+
     // Toast Auto-Dismiss (only for success/error)
     useEffect(() => {
         if (showToast && toastStatus !== 'loading') {
