@@ -84,18 +84,26 @@ export async function POST(req: NextRequest) {
                         // Convert PDF to Base64 for Gemini
                         const arrayBuffer = await data.arrayBuffer();
                         const base64Data = Buffer.from(arrayBuffer).toString("base64");
+
+                        // INJECT LABEL BEFORE PDF
+                        pdfParts.push({ text: `\n[--- INICIO DOCUMENTO: ${f.name} ---]\n(El siguiente contenido pertenece a este archivo)\n` });
+
                         pdfParts.push({
                             inline_data: {
                                 mime_type: "application/pdf",
                                 data: base64Data
                             }
                         });
-                        console.log(`Added PDF context: ${f.name}`);
+
+                        // INJECT LABEL AFTER PDF
+                        pdfParts.push({ text: `\n[--- FIN DOCUMENTO: ${f.name} ---]\n` });
+
+                        console.log(`Added PDF context with label: ${f.name}`);
                     } else {
                         // Handle Text
                         const text = await data.text();
-                        // OPTIMIZATION: Reduce from 6k to 4k chars per file
-                        contextText += `--- FILE: ${f.name} ---\n${text.slice(0, 4000)}\n--- END FILE ---\n`;
+                        // UNCAP LIMIT for Text files to ensure full context reading
+                        contextText += `--- FILE: ${f.name} ---\n${text.slice(0, 50000)}\n--- END FILE ---\n`;
                     }
                 } catch (err: any) {
                     console.warn(`Skipping file ${f.name}:`, err.message);
