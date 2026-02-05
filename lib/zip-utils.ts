@@ -31,6 +31,7 @@ export const exportZip = async (
     const itemMap = new Map(allItems.map(i => [i.id, i]));
 
     // Helper to build relative path from rootFolderId
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const getRelativePath = (item: any): string | null => {
         if (item.id === rootFolderId) return ""; // Base folder itself (shouldn't happen for files)
 
@@ -233,13 +234,15 @@ export const importZip = async (
             current++;
             onProgress({ total, current, filename: fileName });
 
-        } catch (err: any) {
+        } catch (err: unknown) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const error = err as any;
             console.error(`Failed to import ${relativePath}`, {
-                message: err.message || "Unknown error",
-                details: err.details,
-                hint: err.hint,
-                code: err.code,
-                fullError: err
+                message: error.message || "Unknown error",
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                fullError: error
             });
             // Continue with other files
         }

@@ -104,8 +104,8 @@ export default function LibraryPage() {
                 .order('name', { ascending: true })
                 .limit(2000)
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data, error } = await withTimeout(fetchPromise, 10000) as any
+            // eslint-disable-next-line
+            const { data, error } = await withTimeout(Promise.resolve(fetchPromise), 10000) as any
 
             if (error) throw error
 

@@ -94,13 +94,15 @@ export default function TranscriptorPage() {
                 .limit(2000)
 
             // Race against timeout
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
+            // Race against timeout
+            // eslint-disable-next-line
+            const { data, error } = await Promise.race([Promise.resolve(fetchPromise), timeoutPromise]) as any
 
             if (error) throw error
             if (data) setFolders(data)
 
-        } catch (error: any) {
+        } catch (err: unknown) {
+            const error = err as Error;
             console.error(error)
             if (!silent) {
                 alert(error.message === "Tiempo de espera agotado"
@@ -191,8 +193,10 @@ export default function TranscriptorPage() {
         if (uploadError) throw uploadError
 
         // Insert with timeout
+        // Insert with timeout
+        // eslint-disable-next-line
         const { error: dbError } = await withTimeout(
-            supabase.from('files').insert({
+            Promise.resolve(supabase.from('files').insert({
                 user_id: user.id,
                 space_id: currentSpace.id,
                 parent_id: folderId,
@@ -200,7 +204,7 @@ export default function TranscriptorPage() {
                 type: 'file',
                 size_bytes: blob.size,
                 storage_path: filePath
-            }),
+            })),
             10000,
             "El registro en base de datos tardó demasiado."
         )
