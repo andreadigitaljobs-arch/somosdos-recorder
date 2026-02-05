@@ -23,6 +23,7 @@ interface TranscriptionContextType {
     addToQueue: (files: File[]) => void
     updateItemStatus: (id: string, status: QueueItem['status'], progress?: number, transcript?: string, error?: string, statusMessage?: string) => void
     removeItem: (id: string) => void
+    saveToLibrary: (item: QueueItem, folderId: string | null, customName?: string) => Promise<boolean>
 }
 
 const TranscriptionContext = createContext<TranscriptionContextType | undefined>(undefined)
@@ -282,7 +283,7 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
         }
     }, [queue, isProcessing, currentItemId, currentSpace, supabase])
 
-    // Helper for DB Save
+    // Helper for DB Save (Internal Log)
     const saveToDb = async (content: string, item: QueueItem, space: any, chunksCount = 1) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
@@ -299,12 +300,63 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    // === PERSISTENT SAVE TO LIBRARY (Survives Navigation) ===
+    const saveToLibrary = async (item: QueueItem, folderId: string | null, customName?: string) => {
+        // 1. Session Check
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError || !session?.user) {
+            const { data: refreshData } = await supabase.auth.refreshSession()
+            if (!refreshData.session) throw new Error("Tu sesión ha expirado.")
+        }
+
+        const user = (await supabase.auth.getUser()).data.user
+        if (!user) throw new Error("No autenticado")
+        if (!currentSpace) throw new Error("No hay espacio seleccionado")
+
+        // 2. Prepare Data
+        const fullFileName = customName ? customName.trim() : item.file.name
+        const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
+        const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const filePath = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${sanitizedName}`
+
+        const blob = new Blob([item.transcript || ""], { type: 'text/plain' })
+        const fileObj = new File([blob], finalName, { type: 'text/plain' })
+
+        // 3. Parallel Upload & Insert
+        // We do NOT use Promise.race timeout here to allow background throttling to take its time if needed
+        const uploadPromise = supabase.storage.from('library_files').upload(filePath, fileObj)
+
+        const insertPromise = supabase.from('files').insert({
+            user_id: user.id,
+            space_id: currentSpace.id,
+            parent_id: folderId,
+            name: finalName,
+            type: 'file',
+            size_bytes: blob.size,
+            storage_path: filePath
+        }).select().single()
+
+        try {
+            const [uploadResult, insertResult] = await Promise.all([uploadPromise, insertPromise])
+
+            if (uploadResult.error) throw uploadResult.error
+            if (insertResult.error) throw insertResult.error
+
+            return true
+        } catch (error) {
+            console.error("Save failed:", error)
+            // Rollback (Silent)
+            await supabase.storage.from('library_files').remove([filePath])
+            throw error
+        }
+    }
+
     // --- Audio Feedback ---
     const { playSound } = useAudioFeedback()
     const playNotificationSound = playSound // Alias for compatibility with existing code
 
     return (
-        <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem }}>
+        <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem, saveToLibrary }}>
             {children}
         </TranscriptionContext.Provider>
     )

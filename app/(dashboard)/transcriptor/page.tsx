@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -51,7 +51,7 @@ export default function TranscriptorPage() {
     const [previewText, setPreviewText] = useState("")
 
     const { currentSpace } = useSpace()
-    const supabase = useMemo(() => createClient(), [])
+    const supabase = createClient()
 
     // --- File Handling ---
     const onDrop = (acceptedFiles: File[]) => {
@@ -193,58 +193,12 @@ export default function TranscriptorPage() {
         if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // 0. STRICT CONNECTIVITY CHECK (Real DB Ping + Auto-Repair)
-        try {
-            // Use a REAL database query to bypass Auth cache and verify network
-            const pintTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("PING_TIMEOUT")), 5000))
-            // We select just 1 item from files to prove we can talk to the DB
-            const dbPing = supabase.from('files').select('id', { count: 'exact', head: true }).limit(1)
-
-            await Promise.race([dbPing, pintTimeout])
-        } catch (e) {
-            console.warn("Connection dead (DB Ping failed), attempting aggressive recovery...", e)
-            setToastStatus('loading')
-            setToastMessage("Recuperando conexión...")
-            setShowToast(true)
-
-            // Retry Loop: Give the network ~10s to wake up (5 attempts x 2s)
-            let recovered = false
-            for (let i = 0; i < 5; i++) {
-                try {
-                    await new Promise(r => setTimeout(r, 2000)) // Wait 2s
-
-                    // Race refresh against 4s timeout prevents infinite hang
-                    const refreshPromise = supabase.auth.refreshSession()
-                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("REFRESH_TIMEOUT")), 4000))
-
-                    const { data, error } = await Promise.race([refreshPromise, timeoutPromise]) as any
-
-                    if (data?.session && !error) {
-                        recovered = true
-                        break
-                    }
-                } catch (retryError) {
-                    console.log(`Recovery attempt ${i + 1} failed`)
-                }
-            }
-
-            if (!recovered) {
-                setToastStatus('error')
-                setToastMessage("No se pudo reconectar")
-                throw new Error("Conexión perdida irremediablemente. Por favor recarga (F5).")
-            }
-
-            // If recovered, show brief success and continue
-            setToastStatus('success')
-            setToastMessage("Conexión recuperada")
-            await new Promise(r => setTimeout(r, 1000))
-        }
-
-        // 1. Standard Session Validation (Double check after recovery)
+        // Use getSession for faster, local validation to avoid timeouts
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
+        // Explicitly check and try to refresh if needed
         if (sessionError || !session?.user) {
-            console.warn("Session expired, refreshing...")
+            console.warn("Session may be expired, attempting refresh...")
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
             if (refreshError || !refreshData.session) {
                 throw new Error("Tu sesión ha expirado. Por favor recarga la página.")
@@ -279,9 +233,9 @@ export default function TranscriptorPage() {
         }).select().single()
 
         try {
-            // SAFETY TIMEOUT - Extended to 5 minutes to allow background completion
+            // SAFETY TIMEOUT: 15 seconds max
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("La operación tardó demasiado (Timeout 5min).")), 300000)
+                setTimeout(() => reject(new Error("Tiempo de espera agotado (15s). Verifica tu conexión.")), 15000)
             )
 
             const [uploadResult, insertResult] = await Promise.race([
