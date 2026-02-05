@@ -115,6 +115,13 @@ export default function LibraryPage() {
                 storagePath: f.storage_path,
                 size: f.size_bytes ? formatBytes(f.size_bytes) : undefined,
             }))
+
+            // Client-side Natural Sort (1, 2, 10 instead of 1, 10, 2)
+            mappedItems.sort((a, b) => {
+                if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
+                return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+            })
+
             setItems(mappedItems)
 
         } catch (error: any) {
