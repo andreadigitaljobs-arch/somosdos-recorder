@@ -104,19 +104,19 @@ export async function transcribeAudio(params: TranscribeParams) {
         ];
 
         // 3. Generate Content
-        // Gemini 1.5 Flash is the most stable and generous tier currently
-        // Also added 2.0-flash as user seems to have access to it
+        // EXHAUSTIVE MODEL LIST based on User's Diagnostic Dump
         const modelsToTry = [
             "gemini-2.0-flash",
-            "gemini-2.0-flash-lite-preview-02-05",
+            "gemini-2.0-flash-001",
+            "gemini-2.0-flash-lite-preview-02-05", // From List
+            "gemini-2.5-flash", // From List
             "gemini-1.5-flash",
             "gemini-1.5-flash-001",
             "gemini-1.5-pro",
-            "gemini-1.5-flash-8b",
-            "gemini-1.5-pro-001"
+            "gemini-1.5-flash-8b"
         ];
 
-        let lastError = null;
+        let attemptLog: string[] = [];
         let transcriptionText = "";
         let successModel = "";
 
@@ -131,7 +131,7 @@ export async function transcribeAudio(params: TranscribeParams) {
                 break;
             } catch (error: any) {
                 console.error(`Failed with model ${modelName}:`, error.message);
-                lastError = error;
+                attemptLog.push(`${modelName}: ${error.message}`);
                 // Loop continues
             }
         }
@@ -145,11 +145,12 @@ export async function transcribeAudio(params: TranscribeParams) {
         }
 
         if (!transcriptionText) {
-            // If all failed, check if it was a quota error (429) and throw a clearer message
-            if (lastError?.message.includes("429")) {
+            // Check for Quota issues
+            const fullLog = attemptLog.join(" | ");
+            if (fullLog.includes("429")) {
                 throw new Error("Has excedido tu cuota gratuita de Gemini (Error 429).");
             }
-            throw lastError || new Error("Todos los modelos fallaron.");
+            throw new Error(`Todos los modelos fallaron. Detalles: ${fullLog}`);
         }
 
         return { transcription: transcriptionText };
