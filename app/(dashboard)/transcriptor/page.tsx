@@ -94,15 +94,13 @@ export default function TranscriptorPage() {
                 .limit(2000)
 
             // Race against timeout
-            // Race against timeout
-            // eslint-disable-next-line
-            const { data, error } = await Promise.race([Promise.resolve(fetchPromise), timeoutPromise]) as any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
 
             if (error) throw error
             if (data) setFolders(data)
 
-        } catch (err: unknown) {
-            const error = err as Error;
+        } catch (error: any) {
             console.error(error)
             if (!silent) {
                 alert(error.message === "Tiempo de espera agotado"
@@ -162,16 +160,10 @@ export default function TranscriptorPage() {
         if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // Timeout helper
-        async function withTimeout<T>(promise: Promise<T>, ms = 15000, errorMsg = "La operación tardó demasiado"): Promise<T> {
-            const timeout = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error(errorMsg)), ms)
-            )
-            return Promise.race([promise, timeout])
-        }
-
-        const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000, "Error de autenticación (timeout)")
-        if (!user) throw new Error("No usuario autenticado")
+        // Use getSession for faster, local validation to avoid timeouts
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) throw new Error("No usuario autenticado")
+        const user = session.user
 
         // Ensure .txt extension
         const fullFileName = customName ? customName.trim() : item.file.name
@@ -184,30 +176,18 @@ export default function TranscriptorPage() {
         const blob = new Blob([item.transcript], { type: 'text/plain' })
         const fileObj = new File([blob], finalName, { type: 'text/plain' })
 
-        // Upload with timeout
-        const { error: uploadError } = await withTimeout(
-            supabase.storage.from('library_files').upload(filePath, fileObj),
-            20000,
-            "La subida del archivo tardó demasiado. Revisa tu conexión."
-        )
+        const { error: uploadError } = await supabase.storage.from('library_files').upload(filePath, fileObj)
         if (uploadError) throw uploadError
 
-        // Insert with timeout
-        // Insert with timeout
-        // eslint-disable-next-line
-        const { error: dbError } = await withTimeout(
-            Promise.resolve(supabase.from('files').insert({
-                user_id: user.id,
-                space_id: currentSpace.id,
-                parent_id: folderId,
-                name: finalName,
-                type: 'file',
-                size_bytes: blob.size,
-                storage_path: filePath
-            })),
-            10000,
-            "El registro en base de datos tardó demasiado."
-        )
+        const { error: dbError } = await supabase.from('files').insert({
+            user_id: user.id,
+            space_id: currentSpace.id,
+            parent_id: folderId,
+            name: finalName,
+            type: 'file',
+            size_bytes: blob.size,
+            storage_path: filePath
+        })
         if (dbError) throw dbError
     }
 

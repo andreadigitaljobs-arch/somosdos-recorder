@@ -93,10 +93,9 @@ export async function POST(req: NextRequest) {
                     console.log(`Success with model: ${modelName}`);
                     break;
                 }
-            } catch (e: unknown) {
-                const err = e as Error;
-                console.warn(`Failed with model ${modelName}:`, err.message);
-                attemptErrors.push(`${modelName}: ${err.message}`);
+            } catch (e: any) {
+                console.warn(`Failed with model ${modelName}:`, e.message);
+                attemptErrors.push(`${modelName}: ${e.message}`);
             }
         }
 
@@ -113,11 +112,10 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ transcription: text });
 
-    } catch (error: unknown) {
-        const e = error as Error;
+    } catch (error: any) {
         console.error("Transcription error:", error);
         return NextResponse.json(
-            { error: e.message || "Failed to transcribe." },
+            { error: error.message || "Failed to transcribe." },
             { status: 500 }
         );
     } finally {

@@ -81,19 +81,16 @@ export default function LibraryPage() {
         if (items.length === 0) setLoading(true)
 
         try {
-            // Timeout helper
-            async function withTimeout<T>(promise: Promise<T>, ms = 10000, errorMsg = "TIMEOUT"): Promise<T> {
-                const timeout = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error(errorMsg)), ms)
-                )
-                return Promise.race([promise, timeout])
-            }
-
-            const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000)
+            const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
                 setLoading(false)
                 return
             }
+
+            // Timeout Logic
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+            );
 
             const fetchPromise = supabase
                 .from('files')
@@ -102,10 +99,10 @@ export default function LibraryPage() {
                 .eq('space_id', currentSpace.id)
                 .order('type', { ascending: false })
                 .order('name', { ascending: true })
-                .limit(2000)
+                .limit(2000) // Added Safety Limit
 
-            // eslint-disable-next-line
-            const { data, error } = await withTimeout(Promise.resolve(fetchPromise), 10000) as any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
 
             if (error) throw error
 
@@ -123,13 +120,13 @@ export default function LibraryPage() {
         } catch (error: any) {
             console.error('Error fetching files:', error)
             if (error.message === 'TIMEOUT') {
+                // Keep existing items if timeout, just stop loading
                 console.warn("Library fetch timed out")
             }
         } finally {
             setLoading(false)
         }
-    }, [supabase, currentSpace])
-
+    }, [supabase, currentSpace]) // Removed items.length to avoid loops
 
     useEffect(() => {
         if (currentSpace) {
