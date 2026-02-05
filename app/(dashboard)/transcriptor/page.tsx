@@ -121,7 +121,7 @@ export default function TranscriptorPage() {
             }, 30000)
             return () => clearInterval(interval)
         }
-    }, [currentSpace]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [currentSpace, fetchFolders])
 
     const handleCreateFolder = async () => {
         if (!newFolderName || !currentSpace) return
