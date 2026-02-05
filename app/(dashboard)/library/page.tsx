@@ -37,8 +37,10 @@ export default function LibraryPage() {
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
     const [uploading, setUploading] = useState(false)
+    const [isCreating, setIsCreating] = useState(false) // New state for folder creation
     const { currentSpace } = useSpace()
-    const supabase = createClient()
+    // Stable client instance to prevent recreation on every render
+    const supabase = useMemo(() => createClient(), [])
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // --- Modals State ---
@@ -216,14 +218,21 @@ export default function LibraryPage() {
 
     const handleCreateFolder = async () => {
         if (!currentSpace) return alert("Selecciona un espacio primero")
+        if (isCreating) return // Prevent double clicks
+
         const name = prompt("Nombre de la carpeta:")
         if (!name) return
+
+        setIsCreating(true) // Lock UI
 
         // 1. Robust Session Check
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (sessionError || !session) {
             const { data: { session: newSession } } = await supabase.auth.refreshSession()
-            if (!newSession) return alert("Sesión expirada. Recarga la página.")
+            if (!newSession) {
+                setIsCreating(false)
+                return alert("Sesión expirada. Recarga la página.")
+            }
         }
 
         // 2. Retry Logic for Insert
@@ -247,7 +256,7 @@ export default function LibraryPage() {
 
                 if (error) throw error
                 success = true
-                fetchFiles() // Refresh list immediately
+                await fetchFiles() // Refresh list immediately and wait for it
             } catch (error: any) {
                 console.error(`Attempt ${attempt} failed:`, error)
                 if (attempt === maxAttempts) {
@@ -258,6 +267,7 @@ export default function LibraryPage() {
                 }
             }
         }
+        setIsCreating(false) // Unlock UI
     }
 
     const handleUploadClick = () => {
@@ -494,8 +504,9 @@ export default function LibraryPage() {
                             {uploading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
                             {uploading ? "Subiendo..." : "Subir"}
                         </Button>
-                        <Button size="sm" onClick={handleCreateFolder}>
-                            <Plus className="h-4 w-4 mr-2" /> Carpeta
+                        <Button size="sm" onClick={handleCreateFolder} disabled={isCreating || uploading}>
+                            {isCreating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                            {isCreating ? "Creando..." : "Carpeta"}
                         </Button>
                     </div>
                 </div>
