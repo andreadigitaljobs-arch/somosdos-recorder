@@ -20,7 +20,7 @@ type FolderItem = {
 
 export default function TranscriptorPage() {
     // --- Global State ---
-    const { queue, isProcessing, setIsProcessing, addToQueue, removeItem, updateItemStatus } = useTranscription()
+    const { queue, isProcessing, setIsProcessing, addToQueue, removeItem, updateItemStatus, saveToLibrary } = useTranscription()
 
     // --- Local UI State ---
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
