@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
             // Filter for supported types (Text & PDF)
             const supportedFiles = filesMeta.filter(f =>
                 f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
-            ).slice(0, 3); // MAX 3 FILES for Vercel Hobby Tier Limit
+            ).slice(0, 10); // INCREASED TO 10 FILES (Railway can handle it)
 
             console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
 
@@ -140,8 +140,8 @@ INSTRUCTIONS:
   * A SHORT ANSWER: The specific option identifier, e.g., "Opción 1" or "Opción B".
   * A LONG ANSWER: Full explanation. **do NOT use asterisks (*). Use clean dashes (-) for lists or write in paragraphs.** Escaped newlines (\\n) are allowed.
   * THE SOURCE: The exact name of the file(s) where this information was found (e.g., "Marketing_Chapter_1.pdf").
-  * IF THE INFO COMES FROM THE IMAGE ONLY: Use "Imagen proporcionada". 
-  * NEVER return technical error messages like "Not available" or "Derived from image". Only "Imagen proporcionada".
+  * IF THE ANSWER IS NOT IN THE FILES: Use "Conocimiento General de IA". **NEVER use "Imagen proporcionada" - the user knows they provided the image.**
+  * NEVER return technical error messages like "Not available" or "Derived from image".
 - Return the response in this specific JSON format (WITHOUT markdown formatting):
 [
   { 
