@@ -193,12 +193,16 @@ export default function TranscriptorPage() {
         if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // 0. STRICT CONNECTIVITY CHECK (Ping + Auto-Repair)
+        // 0. STRICT CONNECTIVITY CHECK (Real DB Ping + Auto-Repair)
         try {
-            const pintTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("PING_TIMEOUT")), 3000))
-            await Promise.race([supabase.auth.getUser(), pintTimeout])
+            // Use a REAL database query to bypass Auth cache and verify network
+            const pintTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("PING_TIMEOUT")), 5000))
+            // We select just 1 item from files to prove we can talk to the DB
+            const dbPing = supabase.from('files').select('id', { count: 'exact', head: true }).limit(1)
+
+            await Promise.race([dbPing, pintTimeout])
         } catch (e) {
-            console.warn("Connection dead, attempting aggressive recovery...", e)
+            console.warn("Connection dead (DB Ping failed), attempting aggressive recovery...", e)
             setToastStatus('loading')
             setToastMessage("Recuperando conexión...")
             setShowToast(true)
