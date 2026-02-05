@@ -138,9 +138,14 @@ export default function LibraryPage() {
     useEffect(() => {
         if (currentSpace) {
             fetchFiles()
+
+            // Re-fetch on focus to handle stale state after inactivity
+            const handleFocus = () => fetchFiles()
+            window.addEventListener('focus', handleFocus)
+            return () => window.removeEventListener('focus', handleFocus)
         } else {
             setItems([])
-            setLoading(false) // Fix constant loading state on initial load
+            setLoading(false)
         }
     }, [fetchFiles, currentSpace])
 
