@@ -219,18 +219,45 @@ export default function LibraryPage() {
         const name = prompt("Nombre de la carpeta:")
         if (!name) return
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        // 1. Robust Session Check
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError || !session) {
+            const { data: { session: newSession } } = await supabase.auth.refreshSession()
+            if (!newSession) return alert("Sesión expirada. Recarga la página.")
+        }
 
-        const { error } = await supabase.from('files').insert({
-            user_id: user.id,
-            space_id: currentSpace.id,
-            parent_id: currentFolderId,
-            name: name,
-            type: 'folder'
-        })
-        if (error) alert("Error: " + error.message)
-        else fetchFiles()
+        // 2. Retry Logic for Insert
+        let attempt = 0
+        const maxAttempts = 2
+        let success = false
+
+        while (attempt < maxAttempts && !success) {
+            try {
+                attempt++
+                const user = (await supabase.auth.getUser()).data.user
+                if (!user) throw new Error("No autenticado")
+
+                const { error } = await supabase.from('files').insert({
+                    user_id: user.id,
+                    space_id: currentSpace.id,
+                    parent_id: currentFolderId,
+                    name: name,
+                    type: 'folder'
+                })
+
+                if (error) throw error
+                success = true
+                fetchFiles() // Refresh list immediately
+            } catch (error: any) {
+                console.error(`Attempt ${attempt} failed:`, error)
+                if (attempt === maxAttempts) {
+                    alert("No se pudo crear la carpeta: " + (error.message || "Error desconocido"))
+                } else {
+                    // Small delay before retry
+                    await new Promise(r => setTimeout(r, 500))
+                }
+            }
+        }
     }
 
     const handleUploadClick = () => {
