@@ -109,7 +109,7 @@ export default function TranscriptorPage() {
 
     // --- Batch Save State ---
     const [isBatchSaveModalOpen, setIsBatchSaveModalOpen] = useState(false)
-    const [batchFolderName, setBatchFolderName] = useState("")
+    // removed unused batchFolderName
 
     // --- Helper: Save Single Item (Refactored) ---
     const saveItemToLibrary = async (item: QueueItem, folderId: string | null, customName?: string) => {
@@ -159,13 +159,13 @@ export default function TranscriptorPage() {
     const openBatchSave = () => {
         if (!currentSpace) return alert("Selecciona un espacio")
         fetchFolders()
-        setBatchFolderName("")
+        // removed setBatchFolderName
         setIsBatchSaveModalOpen(true)
     }
 
     const confirmBatchSave = async () => {
         const completedItems = queue.filter(i => i.status === 'completed')
-        if (completedItems.length === 0) return
+        if (completedItems.length === 0 || !currentSpace) return // Added currentSpace check
 
         try {
             let targetId = selectedFolderId
