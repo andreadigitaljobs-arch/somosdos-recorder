@@ -1,4 +1,7 @@
 
+// Set max execution time to 60 seconds (Vercel Limit)
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest) {
             // Filter for supported types (Text & PDF)
             const supportedFiles = filesMeta.filter(f =>
                 f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
-            ).slice(0, 8); // REVERT: Restore 8 files for better context coverage
+            ).slice(0, 8); // Top 8 files
 
             console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
 
@@ -155,16 +158,11 @@ INSTRUCTIONS:
             });
         }
 
-        // Correct model names from Google AI API (with models/ prefix)
-        // Gemini 2.5 has 20 req/day limit, Gemma models have higher quotas
+        // Correct model names from Google AI API
         const modelsToTry = [
-            "models/gemini-2.5-flash",
-            "models/gemini-2.0-flash",
-            "models/gemma-3-27b-it",      // Open-source, higher quota
-            "models/gemma-3-12b-it",      // Smaller, faster
-            "models/gemma-3-4b-it",       // Fastest
-            "models/gemini-flash-latest",
-            "models/gemini-pro-latest"
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro"
         ];
 
         let result = null;
