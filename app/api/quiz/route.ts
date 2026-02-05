@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
             // Filter for supported types (Text & PDF)
             const supportedFiles = filesMeta.filter(f =>
                 f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
-            ).slice(0, 10); // INCREASED TO 10 FILES (Railway can handle it)
+            ).slice(0, 5); // OPTIMIZED: 5 FILES (Balance between depth and speed)
 
             console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
 
