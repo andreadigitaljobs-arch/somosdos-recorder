@@ -198,7 +198,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     const finalTranscription = transcriptions.join('\n\n')
                     updateItemStatus(pendingItem.id, 'completed', 100, finalTranscription)
                     playNotificationSound('success')
-                    await saveToDb(finalTranscription, pendingItem, currentSpace, chunks.length)
+                    // Fix: Don't await DB save to prevent blocking queue if network is slow
+                    saveToDb(finalTranscription, pendingItem, currentSpace, chunks.length).catch(e => console.error("Background Save Error:", e))
 
                 } else {
                     // === SINGLE FILE PROCESSING (< 95MB) ===
@@ -233,7 +234,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                     updateItemStatus(pendingItem.id, 'completed', 100, result.transcription)
                     playNotificationSound('success')
-                    await saveToDb(result.transcription || "", pendingItem, currentSpace)
+                    // Fix: Don't await DB save to prevent blocking queue
+                    saveToDb(result.transcription || "", pendingItem, currentSpace).catch(e => console.error("Background Save Error:", e))
                 }
 
             } catch (error: any) {
