@@ -206,7 +206,7 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                         // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
                         const genAI = new GoogleGenerativeAI(apiKey);
-                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
                         const result = await model.generateContent([
                             prompt,
