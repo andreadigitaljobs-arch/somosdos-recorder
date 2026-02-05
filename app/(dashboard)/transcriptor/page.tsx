@@ -107,43 +107,47 @@ export default function TranscriptorPage() {
         }
     }
 
+    // --- Batch Save State ---
+    const [isBatchSaveModalOpen, setIsBatchSaveModalOpen] = useState(false)
+    const [batchFolderName, setBatchFolderName] = useState("")
+
+    // --- Helper: Save Single Item (Refactored) ---
+    const saveItemToLibrary = async (item: QueueItem, folderId: string | null, customName?: string) => {
+        if (!item.transcript || !currentSpace) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("No usuario autenticado")
+
+        // Ensure .txt extension
+        const fullFileName = customName ? customName.trim() : item.file.name
+        const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
+
+        // SANITIZATION
+        const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const filePath = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${sanitizedName}`
+
+        const blob = new Blob([item.transcript], { type: 'text/plain' })
+        const fileObj = new File([blob], finalName, { type: 'text/plain' })
+
+        const { error: uploadError } = await supabase.storage.from('library_files').upload(filePath, fileObj)
+        if (uploadError) throw uploadError
+
+        const { error: dbError } = await supabase.from('files').insert({
+            user_id: user.id,
+            space_id: currentSpace.id,
+            parent_id: folderId,
+            name: finalName,
+            type: 'file',
+            size_bytes: blob.size,
+            storage_path: filePath
+        })
+        if (dbError) throw dbError
+    }
+
     const confirmSave = async () => {
-        if (!itemToSave || !itemToSave.transcript || !currentSpace) return
-
+        if (!itemToSave) return
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) throw new Error("No usuario autenticado")
-
-            // Ensure .txt extension
-            const fullFileName = saveFileName.trim() || itemToSave.file.name
-            const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
-
-            // SANITIZATION FIX:
-            // Storage paths should be URL safe. We replace spaces and non-alphanumerics with _.
-            // We KEEP the finalName for the database display name, but use sanitized for storage.
-            const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
-            const filePath = `${user.id}/${Date.now()}_${sanitizedName}`
-
-            const blob = new Blob([itemToSave.transcript], { type: 'text/plain' })
-            const fileObj = new File([blob], finalName, { type: 'text/plain' }) // File object keep display name
-
-            const { error: uploadError } = await supabase.storage.from('library_files').upload(filePath, fileObj)
-            if (uploadError) throw uploadError
-
-            const { error: dbError } = await supabase.from('files').insert({
-                user_id: user.id,
-                space_id: currentSpace.id,
-                parent_id: selectedFolderId,
-                name: finalName, // Display name (can have spaces)
-                type: 'file',
-                size_bytes: blob.size,
-                storage_path: filePath // Sanitized path
-            })
-            if (dbError) throw dbError
-
-            // Also save to Transcriptions table? Ideally yes, but users want the file generally.
-            // For now, saving as file is what was requested.
-
+            await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
             alert("Guardado con éxito!")
             setIsSaveModalOpen(false)
         } catch (error: any) {
@@ -151,6 +155,57 @@ export default function TranscriptorPage() {
             alert(`Error al guardar: ${error.message}`)
         }
     }
+
+    const openBatchSave = () => {
+        if (!currentSpace) return alert("Selecciona un espacio")
+        fetchFolders()
+        setBatchFolderName("")
+        setIsBatchSaveModalOpen(true)
+    }
+
+    const confirmBatchSave = async () => {
+        const completedItems = queue.filter(i => i.status === 'completed')
+        if (completedItems.length === 0) return
+
+        try {
+            let targetId = selectedFolderId
+
+            // If creating a new folder for this batch
+            if (isCreatingFolder && newFolderName) {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (!user) return
+                const { data, error } = await supabase.from('files').insert({
+                    user_id: user.id,
+                    space_id: currentSpace.id,
+                    parent_id: selectedFolderId, // Can be nested
+                    name: newFolderName,
+                    type: 'folder'
+                }).select().single()
+                if (error) throw error
+                targetId = data.id
+            }
+
+            // Loop and Save
+            let successCount = 0
+            for (const item of completedItems) {
+                try {
+                    await saveItemToLibrary(item, targetId)
+                    successCount++
+                } catch (e) {
+                    console.error(`Failed to save ${item.file.name}`, e)
+                }
+            }
+
+            alert(`Guardado completado: ${successCount}/${completedItems.length} archivos.`)
+            setIsBatchSaveModalOpen(false)
+            setIsCreatingFolder(false)
+            setNewFolderName("")
+
+        } catch (error: any) {
+            alert("Error en guardado masivo: " + error.message)
+        }
+    }
+
 
     // --- Preview Logic ---
     const openPreview = (item: QueueItem) => {
@@ -171,6 +226,11 @@ export default function TranscriptorPage() {
         <div className="space-y-4 h-full flex flex-col relative">
             <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Transcriptor IA</h2>
+                {queue.some(i => i.status === 'completed') && (
+                    <Button onClick={openBatchSave} className="bg-primary hover:bg-primary/90">
+                        <Save className="h-4 w-4 mr-2" /> Guardar Todo ({queue.filter(i => i.status === 'completed').length})
+                    </Button>
+                )}
             </div>
 
             {/* Main Area: Split into Upload / Queue */}
@@ -325,6 +385,53 @@ export default function TranscriptorPage() {
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={() => setIsSaveModalOpen(false)}>Cancelar</Button>
                             <Button onClick={confirmSave}>Guardar</Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Batch Save Modal */}
+            {isBatchSaveModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <Card className="w-full max-w-md p-6 space-y-4 bg-background border-border shadow-2xl relative">
+                        <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setIsBatchSaveModalOpen(false)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                        <h3 className="text-lg font-semibold">Guardar Todo ({queue.filter(i => i.status === 'completed').length})</h3>
+                        <p className="text-sm text-muted-foreground">Elige dónde guardar los archivos resultantes.</p>
+
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Carpeta de Destino</label>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1">
+                                    <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
+                                        <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
+                                    </button>
+                                    {folders.map(f => (
+                                        <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
+                                            <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                {!isCreatingFolder ? (
+                                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
+                                        <FolderPlus className="h-4 w-4 mr-2" /> Crear Carpeta para este lote
+                                    </Button>
+                                ) : (
+                                    <div className="flex gap-2 mt-2">
+                                        <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Ej: Transcripciones Reunión X" className="h-8" />
+                                        <Button size="sm" onClick={() => { /* Logic to create wrapper folder in memory? No just create immediately */ }} disabled>
+                                            Use 'Crear' inside logic
+                                        </Button>
+                                        <span className="text-xs text-muted-foreground self-center">Se creará al guardar</span>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setIsBatchSaveModalOpen(false)}>Cancelar</Button>
+                            <Button onClick={confirmBatchSave}>Guardar Todo</Button>
                         </div>
                     </Card>
                 </div>
