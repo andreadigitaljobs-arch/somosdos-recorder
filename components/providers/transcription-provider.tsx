@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { useSpace } from "@/components/providers/space-provider"
 import { createClient } from "@/lib/supabase/client"
+import { useAudioFeedback } from "@/hooks/use-audio-feedback"
 
 export type QueueItem = {
     id: string
@@ -267,43 +268,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     // --- Audio Feedback ---
-    const playNotificationSound = (type: 'success' | 'error' | 'start') => {
-        try {
-            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioContext) return;
-            const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            if (type === 'success') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, ctx.currentTime);
-                osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.6);
-            } else if (type === 'start') {
-                osc.frequency.setValueAtTime(440, ctx.currentTime);
-                gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.2);
-            } else {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(110, ctx.currentTime);
-                osc.frequency.linearRampToValueAtTime(55, ctx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + 0.3);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-    }
+    const { playSound } = useAudioFeedback()
+    const playNotificationSound = playSound // Alias for compatibility with existing code
 
     return (
         <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem }}>

@@ -9,6 +9,7 @@ import { motion } from "framer-motion"
 import { useSpace } from "@/components/providers/space-provider"
 import { createBrowserClient } from "@supabase/ssr"
 import { FormattedText } from "@/components/formatted-text"
+import { useAudioFeedback } from "@/hooks/use-audio-feedback"
 
 // UI Types
 type QuestionResult = {
@@ -33,7 +34,9 @@ export default function QuizPage() {
     const [currentQuizId, setCurrentQuizId] = useState<string | null>(null)
     const [editingIndex, setEditingIndex] = useState<number | null>(null)
     const [editValue, setEditValue] = useState("")
+    const [editValue, setEditValue] = useState("")
     const { currentSpace } = useSpace()
+    const { playSound } = useAudioFeedback()
 
     // Reset state when space changes
     useEffect(() => {
@@ -107,6 +110,7 @@ export default function QuizPage() {
     const handleSolve = async () => {
         if ((images.length === 0 && !context) || !currentSpace) return
         setLoading(true)
+        playSound('start')
         setResults([])
 
         try {
@@ -161,6 +165,7 @@ export default function QuizPage() {
 
             setResults(data.results)
             setLoading(false) // UNBLOCK UI IMMEDIATELY
+            playSound('success')
 
             // Save to Supabase for Analytics/History (Non-blocking)
             if (session.user) {
@@ -179,6 +184,7 @@ export default function QuizPage() {
             console.error(error)
             setResults([{ q: "Error", a: error.message || "No se pudo generar el quiz." }])
             setLoading(false)
+            playSound('error')
         }
     }
 
