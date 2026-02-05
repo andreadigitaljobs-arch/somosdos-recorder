@@ -128,24 +128,28 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                 const useChunking = shouldUseChunking(pendingItem.file, 95)
 
                 // Helper to safely import with version check
-                const safeImport = async<T>(importFn: () => Promise<T>): Promise<T> => {
+                async function safeImport<T>(importFn: () => Promise<T>): Promise<T> {
                     try {
                         return await importFn()
                     } catch (error: any) {
-                        if (error.name === 'ChunkLoadError' || error.message?.includes('load chunk')) {
-                            throw new Error("Sistema actualizado. Por favor recarga la página (F5) para continuar.")
+                        try {
+                            if (error.name === 'ChunkLoadError' || error.message?.includes('load chunk')) {
+                                throw new Error("Sistema actualizado. Por favor recarga la página (F5) para continuar.")
+                            }
+                        } catch (e) {
+                            // Ignore error checking logic errors
                         }
-                    throw error
+                        throw error
                     }
                 }
 
-                    if (useChunking) {
-                        // === CHUNKED PROCESSING (For files > 95MB) ===
-                        let currentExtractMsg = getRandomMessage('extract')
+                if (useChunking) {
+                    // === CHUNKED PROCESSING (For files > 95MB) ===
+                    let currentExtractMsg = getRandomMessage('extract')
                     updateItemStatus(pendingItem.id, 'processing', 5, undefined, undefined, currentExtractMsg)
 
                     // Step 1: Extract and split audio
-                    const {processFileIntoChunks} = await safeImport(() => import('@/lib/audio-chunker'))
+                    const { processFileIntoChunks } = await safeImport(() => import('@/lib/audio-chunker'))
                     let chunks: Blob[] = []
 
                     try {
@@ -172,31 +176,31 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                     for (let i = 0; i < chunks.length; i++) {
                         const chunk = chunks[i]
-                    const chunkProgress = 30 + ((i / chunks.length) * 65)
+                        const chunkProgress = 30 + ((i / chunks.length) * 65)
 
-                    updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Analizando bloque ${i + 1}/${chunks.length}...`)
+                        updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Analizando bloque ${i + 1}/${chunks.length}...`)
 
-                    // Convert Chunk to Base64
-                    const base64Promise = new Promise<string>((resolve, reject) => {
+                        // Convert Chunk to Base64
+                        const base64Promise = new Promise<string>((resolve, reject) => {
                             const reader = new FileReader();
                             reader.onloadend = () => {
                                 const result = reader.result as string;
-                        // Handle both data: URLs and raw
-                        const base64 = result.includes(',') ? result.split(',')[1] : result;
-                        resolve(base64);
+                                // Handle both data: URLs and raw
+                                const base64 = result.includes(',') ? result.split(',')[1] : result;
+                                resolve(base64);
                             }
-                        reader.onerror = reject;
-                        reader.readAsDataURL(chunk);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(chunk);
                         });
                         const base64Data = await base64Promise;
 
                         // Call SERVER ACTION
-                        const {transcribeAudio} = await safeImport(() => import("@/app/actions/transcribe"))
+                        const { transcribeAudio } = await safeImport(() => import("@/app/actions/transcribe"))
                         const result = await transcribeAudio({
                             fileBase64: base64Data,
-                        apiKey: localKey, // Pass local key if exists, or Server will use ENV
-                        mimeType: 'audio/mp3',
-                        originalName: `part_${i}_${safeName}`
+                            apiKey: localKey, // Pass local key if exists, or Server will use ENV
+                            mimeType: 'audio/mp3',
+                            originalName: `part_${i}_${safeName}`
                         })
 
                         if (result.error) {
@@ -206,17 +210,17 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                         transcriptions.push(result.transcription || "")
                     }
 
-                        // Step 3: Combine
-                        const finalTranscription = transcriptions.join('\n\n')
-                        updateItemStatus(pendingItem.id, 'completed', 100, finalTranscription)
-                        playNotificationSound('success')
+                    // Step 3: Combine
+                    const finalTranscription = transcriptions.join('\n\n')
+                    updateItemStatus(pendingItem.id, 'completed', 100, finalTranscription)
+                    playNotificationSound('success')
                     // Fix: Don't await DB save to prevent blocking queue if network is slow
                     saveToDb(finalTranscription, pendingItem, currentSpace, chunks.length).catch(e => console.error("Background Save Error:", e))
 
                 } else {
-                            // === SINGLE FILE PROCESSING (< 95MB) ===
-                            // This is the optimized path on Railway
-                            updateItemStatus(pendingItem.id, 'processing', 10, undefined, undefined, getRandomMessage('upload'))
+                    // === SINGLE FILE PROCESSING (< 95MB) ===
+                    // This is the optimized path on Railway
+                    updateItemStatus(pendingItem.id, 'processing', 10, undefined, undefined, getRandomMessage('upload'))
 
                     const base64Promise = new Promise<string>((resolve, reject) => {
                         const reader = new FileReader();
@@ -225,77 +229,77 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                             const base64 = result.includes(',') ? result.split(',')[1] : result;
                             resolve(base64);
                         }
-                            reader.onerror = reject;
-                            reader.readAsDataURL(pendingItem.file);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(pendingItem.file);
                     });
-                            const base64Data = await base64Promise;
+                    const base64Data = await base64Promise;
 
-                            updateItemStatus(pendingItem.id, 'processing', 40, undefined, undefined, getRandomMessage('transcribe'))
+                    updateItemStatus(pendingItem.id, 'processing', 40, undefined, undefined, getRandomMessage('transcribe'))
 
-                            const {transcribeAudio} = await safeImport(() => import("@/app/actions/transcribe"))
-                            const result = await transcribeAudio({
-                                fileBase64: base64Data, // Send Full File
-                            apiKey: localKey,
-                            mimeType: pendingItem.file.type || 'audio/mp3',
-                            originalName: safeName
+                    const { transcribeAudio } = await safeImport(() => import("@/app/actions/transcribe"))
+                    const result = await transcribeAudio({
+                        fileBase64: base64Data, // Send Full File
+                        apiKey: localKey,
+                        mimeType: pendingItem.file.type || 'audio/mp3',
+                        originalName: safeName
                     })
 
-                            if (result.error) {
+                    if (result.error) {
                         throw new Error(`Error Servidor: ${result.error}`)
                     }
 
-                            updateItemStatus(pendingItem.id, 'completed', 100, result.transcription)
-                            playNotificationSound('success')
+                    updateItemStatus(pendingItem.id, 'completed', 100, result.transcription)
+                    playNotificationSound('success')
                     // Fix: Don't await DB save to prevent blocking queue
                     saveToDb(result.transcription || "", pendingItem, currentSpace).catch(e => console.error("Background Save Error:", e))
                 }
 
             } catch (error: any) {
-                                console.error(error)
+                console.error(error)
                 updateItemStatus(pendingItem.id, 'error', 0, undefined, error.message)
-                            playNotificationSound('error')
+                playNotificationSound('error')
             } finally {
-                                setCurrentItemId(null)
-                            }
+                setCurrentItemId(null)
+            }
         }
 
-                            if (isProcessing && !currentItemId) {
-                                processQueue()
-                            }
+        if (isProcessing && !currentItemId) {
+            processQueue()
+        }
     }, [queue, isProcessing, currentItemId, currentSpace, supabase])
 
     // Helper for DB Save
     const saveToDb = async (content: string, item: QueueItem, space: any, chunksCount = 1) => {
-        const {data: {user} } = await supabase.auth.getUser()
-                            if (user) {
-                                await supabase.from('transcriptions').insert({
-                                    user_id: user.id,
-                                    content: content,
-                                    metadata: {
-                                        space_id: space?.id,
-                                        filename: item.file.name,
-                                        file_size: item.file.size,
-                                        chunks_processed: chunksCount
-                                    }
-                                })
-                            }
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            await supabase.from('transcriptions').insert({
+                user_id: user.id,
+                content: content,
+                metadata: {
+                    space_id: space?.id,
+                    filename: item.file.name,
+                    file_size: item.file.size,
+                    chunks_processed: chunksCount
+                }
+            })
+        }
     }
 
-                            // --- Audio Feedback ---
-                            const {playSound} = useAudioFeedback()
-                            const playNotificationSound = playSound // Alias for compatibility with existing code
+    // --- Audio Feedback ---
+    const { playSound } = useAudioFeedback()
+    const playNotificationSound = playSound // Alias for compatibility with existing code
 
-                            return (
-                            <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem }}>
-                                {children}
-                            </TranscriptionContext.Provider>
-                            )
+    return (
+        <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem }}>
+            {children}
+        </TranscriptionContext.Provider>
+    )
 }
 
-                            export function useTranscription() {
+export function useTranscription() {
     const context = useContext(TranscriptionContext)
-                            if (context === undefined) {
+    if (context === undefined) {
         throw new Error('useTranscription must be used within a TranscriptionProvider')
     }
-                            return context
+    return context
 }
