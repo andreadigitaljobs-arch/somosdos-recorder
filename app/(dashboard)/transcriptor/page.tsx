@@ -409,7 +409,7 @@ export default function TranscriptorPage() {
                                     </Button>
                                 </div>
                                 <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
-                                    {loadingFolders && (
+                                    {loadingFolders && folders.length === 0 && (
                                         <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
                                             <Loader2 className="h-5 w-5 animate-spin text-primary" />
                                         </div>
@@ -465,7 +465,7 @@ export default function TranscriptorPage() {
                                     </Button>
                                 </div>
                                 <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
-                                    {loadingFolders && (
+                                    {loadingFolders && folders.length === 0 && (
                                         <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
                                             <Loader2 className="h-5 w-5 animate-spin text-primary" />
                                         </div>
