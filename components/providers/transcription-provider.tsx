@@ -150,7 +150,7 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     try {
                         chunks = await processFileIntoChunks(
                             pendingItem.file,
-                            10, // 10-minute chunks
+                            3, // 3-minute chunks (Safe for 60s timeout)
                             (stage, progress, details) => {
                                 if (stage === 'extract') {
                                     // Update progress but KEEP the same message to avoid flickering

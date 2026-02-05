@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
             // Filter for supported types (Text & PDF)
             const supportedFiles = filesMeta.filter(f =>
                 f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
-            ).slice(0, 8); // Top 8 files
+            ).slice(0, 5); // Reduced to 5 for speed
 
             console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
 
