@@ -64,7 +64,8 @@ export default function TranscriptorPage() {
         setSaveFileName(originalName)
 
         setIsSaveModalOpen(true)
-        fetchFolders()
+        // Only show loading spinner if we don't have folders yet
+        fetchFolders(folders.length > 0)
     }
 
     const fetchFolders = async (silent = false) => {
