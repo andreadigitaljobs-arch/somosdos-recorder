@@ -95,8 +95,26 @@ export async function transcribeAudio(params: TranscribeParams) {
         const fileUri = uploadResult.file.uri;
         console.log(`Uploaded to Google: ${fileUri}`);
 
-        // Wait for processing (for Video/Audio usually instant, but good practice)
-        // For audio it's usually Active immediately.
+        // Wait for processing (Crucial for Video)
+        let file = await fileManager.getFile(uploadResult.file.name);
+        let retries = 0;
+        const maxRetries = 60; // 2 minutes max waiting
+
+        while (file.state === "PROCESSING") {
+            retries++;
+            if (retries > maxRetries) {
+                throw new Error("Timeout esperando que Google procese el archivo (Video muy largo o servicio lento).");
+            }
+            console.log(`File processing... (${retries}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            file = await fileManager.getFile(uploadResult.file.name);
+        }
+
+        if (file.state === "FAILED") {
+            throw new Error("Google falló al procesar el archivo de video/audio.");
+        }
+
+        console.log(`File is ACTIVE. State: ${file.state}`);
 
         let promptParts = [
             { text: prompt },
