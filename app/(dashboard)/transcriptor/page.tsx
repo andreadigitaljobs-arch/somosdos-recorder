@@ -50,6 +50,8 @@ export default function TranscriptorPage() {
         maxFiles: 10
     })
 
+    const [loadingFolders, setLoadingFolders] = useState(false)
+
     // --- Save Modal Logic ---
     const openSaveModal = (item: QueueItem) => {
         if (!currentSpace) {
@@ -67,17 +69,28 @@ export default function TranscriptorPage() {
 
     const fetchFolders = async () => {
         if (!currentSpace) return
+        setLoadingFolders(true)
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        if (!user) {
+            setLoadingFolders(false)
+            return
+        }
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('files')
             .select('id, name, parent_id')
             .eq('user_id', user.id)
             .eq('space_id', currentSpace.id)
             .eq('type', 'folder')
             .order('name', { ascending: true })
+            .limit(2000) // RAISED LIMIT
+
+        if (error) {
+            console.error(error)
+            alert("Error cargando carpetas. Intenta refrescar.")
+        }
         if (data) setFolders(data)
+        setLoadingFolders(false)
     }
 
     const handleCreateFolder = async () => {
@@ -101,9 +114,9 @@ export default function TranscriptorPage() {
             if (data) setSelectedFolderId(data.id)
             setNewFolderName("")
             setIsCreatingFolder(false)
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
-            alert("Error creando carpeta")
+            alert("Error creando carpeta: " + e.message)
         }
     }
 
@@ -358,8 +371,18 @@ export default function TranscriptorPage() {
                                 <Input value={saveFileName} onChange={(e) => setSaveFileName(e.target.value)} />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-medium">Carpeta</label>
-                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-medium">Carpeta</label>
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={fetchFolders} title="Recargar carpetas">
+                                        <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
+                                    {loadingFolders && (
+                                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                        </div>
+                                    )}
                                     <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
                                         <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
                                     </button>
@@ -376,7 +399,9 @@ export default function TranscriptorPage() {
                                 ) : (
                                     <div className="flex gap-2 mt-2">
                                         <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nombre carpeta" className="h-8" />
-                                        <Button size="sm" onClick={handleCreateFolder}>Crear</Button>
+                                        <Button size="sm" onClick={handleCreateFolder} disabled={loadingFolders}>
+                                            {loadingFolders ? <Loader2 className="h-3 w-3 animate-spin" /> : "Crear"}
+                                        </Button>
                                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
                                     </div>
                                 )}
@@ -402,8 +427,18 @@ export default function TranscriptorPage() {
 
                         <div className="space-y-3">
                             <div className="space-y-1">
-                                <label className="text-xs font-medium">Carpeta de Destino</label>
-                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-medium">Carpeta de Destino</label>
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={fetchFolders} title="Recargar carpetas">
+                                        <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
+                                    {loadingFolders && (
+                                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                        </div>
+                                    )}
                                     <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
                                         <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
                                     </button>
