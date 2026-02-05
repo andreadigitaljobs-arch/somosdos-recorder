@@ -274,8 +274,8 @@ export default function TranscriptorPage() {
         setShowToast(true)
 
         try {
-            // 3. Background Save
-            await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
+            // 3. Background Save (Persistent)
+            await saveToLibrary(itemToSave, selectedFolderId, saveFileName)
 
             // 4. Update Toast to Success
             setToastStatus('success')
@@ -331,7 +331,7 @@ export default function TranscriptorPage() {
             // Run all saves simultaneously so total timeout is max ~15s, not 15s * N
             const savePromises = completedItems.map(async (item) => {
                 try {
-                    await saveItemToLibrary(item, targetId)
+                    await saveToLibrary(item, targetId)
                     return { status: 'fulfilled', item }
                 } catch (error) {
                     console.error(`Failed to save ${item.file.name}`, error)
