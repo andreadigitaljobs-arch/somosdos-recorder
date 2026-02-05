@@ -32,7 +32,7 @@ export const useSpace = () => useContext(SpaceContext)
 
 export function SpaceProvider({ children }: { children: React.ReactNode }) {
     const [spaces, setSpaces] = useState<Space[]>([])
-    const [currentSpace, setCurrentSpace] = useState<Space | null>(null)
+    const [currentSpace, _setCurrentSpace] = useState<Space | null>(null)
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
     const [newSpaceName, setNewSpaceName] = useState("")
@@ -41,6 +41,16 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     // Actually simplicity: if currentSpace is null, show selection. If set, show children.
 
     const supabase = createClient()
+
+    // Wrapper to handle persistence
+    const setCurrentSpace = (space: Space | null) => {
+        _setCurrentSpace(space)
+        if (space) {
+            localStorage.setItem('current_space_id', space.id)
+        } else {
+            localStorage.removeItem('current_space_id')
+        }
+    }
 
     const fetchSpaces = useCallback(async () => {
         try {
@@ -63,13 +73,13 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
                 const storedId = localStorage.getItem('current_space_id')
                 if (storedId) {
                     const found = data.find((s: Space) => s.id === storedId)
-                    if (found) setCurrentSpace(found)
+                    if (found) _setCurrentSpace(found)
                 }
             }
         } catch (error) {
             console.error("Unexpected error in space provider:", error)
         }
-    }, [supabase, setSpaces, setCurrentSpace])
+    }, [supabase, setSpaces]) // removed setCurrentSpace dependency to avoid loop, it's stable enough or we use wrapping
 
     useEffect(() => {
         let mounted = true
@@ -101,14 +111,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         init()
     }, [supabase, fetchSpaces])
 
-    const handleSelectSpace = (space: Space | null) => {
-        setCurrentSpace(space)
-        if (space) {
-            localStorage.setItem('current_space_id', space.id)
-        } else {
-            localStorage.removeItem('current_space_id')
-        }
-    }
+    const handleSelectSpace = setCurrentSpace // Alias for internal use if needed, or remove handleSelectSpace usage below
 
     const handleCreateSpace = async () => {
         if (!newSpaceName.trim()) return
