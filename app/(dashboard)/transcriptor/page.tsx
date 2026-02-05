@@ -28,6 +28,15 @@ export default function TranscriptorPage() {
     const [saveFileName, setSaveFileName] = useState("")
     const [folders, setFolders] = useState<FolderItem[]>([])
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+    const [showSuccessToast, setShowSuccessToast] = useState(false)
+
+    // Toast Auto-Dismiss
+    useEffect(() => {
+        if (showSuccessToast) {
+            const timer = setTimeout(() => setShowSuccessToast(false), 3000)
+            return () => clearTimeout(timer)
+        }
+    }, [showSuccessToast])
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState("")
 
@@ -198,7 +207,7 @@ export default function TranscriptorPage() {
         try {
             setIsSaving(true)
             await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
-            alert("Guardado con éxito!")
+            setShowSuccessToast(true)
             setIsSaveModalOpen(false)
         } catch (error: any) {
             console.error("Error guardando:", error)
@@ -249,6 +258,7 @@ export default function TranscriptorPage() {
             }
 
             alert(`Guardado completado: ${successCount}/${completedItems.length} archivos.`)
+            setShowSuccessToast(true)
             setIsBatchSaveModalOpen(false)
             setIsCreatingFolder(false)
             setNewFolderName("")
