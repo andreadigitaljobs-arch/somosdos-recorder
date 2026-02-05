@@ -383,6 +383,25 @@ export default function TranscriptorPage() {
 
     return (
         <div className="space-y-4 h-full flex flex-col relative">
+            {/* Connection Status Indicator - ALWAYS VISIBLE */}
+            <div
+                onClick={() => fetchFolders(false)}
+                className={`absolute top-0 right-0 z-50 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 transition-all duration-300 cursor-pointer shadow-sm
+                    ${connectionStatus === 'connected' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200' :
+                        connectionStatus === 'reconnecting' ? 'bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200' :
+                            'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200'}`}
+                title="Click para actualizar conexión"
+            >
+                <div className={`w-2 h-2 rounded-full 
+                    ${connectionStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                        connectionStatus === 'reconnecting' ? 'bg-amber-500 animate-bounce' :
+                            'bg-red-500'}`}
+                />
+                {connectionStatus === 'connected' ? 'En Línea' :
+                    connectionStatus === 'reconnecting' ? 'Reconectando...' :
+                        'Sin Conexión'}
+            </div>
+
             {/* Custom Status Toast */}
             <AnimatePresence mode="wait">
                 {showToast && (
