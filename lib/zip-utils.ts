@@ -18,16 +18,10 @@ export const exportZip = async (
     onProgress("Analizando estructura...");
     const zip = new JSZip();
 
-    // 1. Fetch all files/folders in the space with Metadata
+    // 1. Fetch all files/folders in the space
     const { data: allItems, error } = await supabase
         .from("files")
-        .select(`
-            id, name, type, parent_id, storage_path,
-            file_analysis (*),
-            file_tags (
-                tags (name)
-            )
-        `)
+        .select("id, name, type, parent_id, storage_path")
         .eq("space_id", spaceId);
 
     if (error) throw error;
@@ -80,28 +74,12 @@ export const exportZip = async (
         try {
             onProgress(`Descargando ${Math.round((processed / totalFiles) * 100)}%: ${fileItem.name}`);
 
-            // Download Content
             const { data, error } = await supabase.storage
                 .from('library_files')
                 .download(fileItem.storage_path);
 
             if (!error && data) {
                 zip.file(relPath, data);
-
-                // Export Metadata (AI Analysis + Tags)
-                // We create a sidecar JSON file: "Filename.txt_meta.json" or similar
-                const analysis = fileItem.file_analysis?.[0] || fileItem.file_analysis // Handle single/array quirk
-                const tags = fileItem.file_tags?.map((ft: any) => ft.tags?.name).filter(Boolean) || []
-
-                if (analysis || tags.length > 0) {
-                    const metadata = {
-                        filename: fileItem.name,
-                        tags: tags,
-                        ai_analysis: analysis || null
-                    }
-                    // e.g. "Folder/MyFile.txt" -> "Folder/MyFile.txt.json"
-                    zip.file(`${relPath}.json`, JSON.stringify(metadata, null, 2))
-                }
             }
         } catch (e) {
             console.error("Skipping file", fileItem.name);

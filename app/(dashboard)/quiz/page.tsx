@@ -135,6 +135,10 @@ export default function QuizPage() {
                 })
             }))
 
+            // Timeout Controller to prevent infinite loading (25s limit)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+
             const response = await fetch('/api/quiz', {
                 method: 'POST',
                 headers: {
@@ -146,8 +150,11 @@ export default function QuizPage() {
                     spaceId: currentSpace.id,
                     apiKey,
                     images: processedImages
-                })
+                }),
+                signal: controller.signal
             })
+
+            clearTimeout(timeoutId);
 
             const data = await response.json()
             if (!response.ok) throw new Error(data.error || "Error en el servidor")

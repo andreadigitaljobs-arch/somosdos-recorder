@@ -1,7 +1,4 @@
 
-// Set max execution time to 60 seconds (Vercel Limit)
-export const maxDuration = 60;
-
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
@@ -55,7 +52,7 @@ export async function POST(req: NextRequest) {
             // Filter for supported types (Text & PDF)
             const supportedFiles = filesMeta.filter(f =>
                 f.name.match(/\.(txt|md|csv|json|js|ts|py|html|pdf)$/i)
-            ).slice(0, 5); // Reduced to 5 for speed
+            ).slice(0, 3); // MAX 3 FILES for Vercel Hobby Tier Limit
 
             console.log(`Deep Search: Found ${filesMeta.length} total files. Analyzing top ${supportedFiles.length} documents.`);
 
@@ -64,31 +61,44 @@ export async function POST(req: NextRequest) {
 
                 const isPdf = f.name.match(/\.pdf$/i);
 
-                const { data, error } = await supabase.storage
-                    .from('library_files')
-                    .download(f.storage_path);
+                try {
+                    // Timeout wrapper for Supabase Download
+                    const downloadPromise = supabase.storage
+                        .from('library_files')
+                        .download(f.storage_path);
 
-                if (error) {
-                    console.error(`Error downloading ${f.name}:`, error);
-                    return;
-                }
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("Timeout")), 6000)
+                    );
 
-                if (isPdf) {
-                    // Convert PDF to Base64 for Gemini
-                    const arrayBuffer = await data.arrayBuffer();
-                    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-                    pdfParts.push({
-                        inline_data: {
-                            mime_type: "application/pdf",
-                            data: base64Data
-                        }
-                    });
-                    console.log(`Added PDF context: ${f.name}`);
-                } else {
-                    // Handle Text
-                    const text = await data.text();
-                    // OPTIMIZATION: Reduce from 10k to 6k chars per file for faster processing
-                    contextText += `--- FILE: ${f.name} ---\n${text.slice(0, 6000)}\n--- END FILE ---\n`;
+                    const result = await Promise.race([downloadPromise, timeoutPromise]) as any;
+
+                    if (result.error) {
+                        console.error(`Error downloading ${f.name}:`, result.error);
+                        return;
+                    }
+
+                    const data = result.data;
+
+                    if (isPdf) {
+                        // Convert PDF to Base64 for Gemini
+                        const arrayBuffer = await data.arrayBuffer();
+                        const base64Data = Buffer.from(arrayBuffer).toString("base64");
+                        pdfParts.push({
+                            inline_data: {
+                                mime_type: "application/pdf",
+                                data: base64Data
+                            }
+                        });
+                        console.log(`Added PDF context: ${f.name}`);
+                    } else {
+                        // Handle Text
+                        const text = await data.text();
+                        // OPTIMIZATION: Reduce from 6k to 4k chars per file
+                        contextText += `--- FILE: ${f.name} ---\n${text.slice(0, 4000)}\n--- END FILE ---\n`;
+                    }
+                } catch (err: any) {
+                    console.warn(`Skipping file ${f.name}:`, err.message);
                 }
             });
 
@@ -158,11 +168,13 @@ INSTRUCTIONS:
             });
         }
 
-        // Correct model names from Google AI API
+        // Correct model names from Google AI API (with models/ prefix)
+        // Gemini 2.5 has 20 req/day limit, Gemma models have higher quotas
+        // Gemini 1.5 Flash is the most stable and generous tier currently
         const modelsToTry = [
-            "gemini-2.0-flash",
             "gemini-1.5-flash",
-            "gemini-1.5-pro"
+            "gemini-1.5-pro",
+            "gemini-1.0-pro"
         ];
 
         let result = null;
@@ -210,11 +222,10 @@ INSTRUCTIONS:
         } catch (e) {
             console.error("Failed to parse JSON:", responseText);
             // Fallback
-            parsedParams = [{ q: "Error parsing AI response", a: responseText.substring(0, 500) }];
-        }
-
-        if (!parsedParams || parsedParams.length === 0) {
-            parsedParams = [{ q: "Sin resultados", a: "La IA no encontró información relevante en los archivos analizados (Top 8). Intenta subir más contexto o ser más específico." }];
+            parsedParams = [{
+                q: "Error de Formato en IA",
+                a: "La inteligencia artificial generó una respuesta pero no pudimos leerla correctamente. Intenta de nuevo. \n\nRespuesta cruda: " + responseText.substring(0, 200) + "..."
+            }];
         }
 
         return NextResponse.json({ results: parsedParams });

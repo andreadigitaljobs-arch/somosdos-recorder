@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft, Copy, Check, Brain, Tag } from "lucide-react"
+import { Folder, FileText, ChevronRight, Plus, Upload, Search, Trash2, Eye, X, MoreVertical, Pencil, FolderInput, CornerUpLeft, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
@@ -20,7 +19,6 @@ import {
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { SmartFileViewer } from "@/components/smart-file-viewer"
 
 
 // Types
@@ -31,7 +29,6 @@ type FileSystemItem = {
     parentId: string | null
     size?: string
     storagePath?: string
-    tags?: string[]
 }
 
 export default function LibraryPage() {
@@ -74,9 +71,6 @@ export default function LibraryPage() {
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
     }
 
-    const [availableTags, setAvailableTags] = useState<string[]>([])
-    const [selectedTag, setSelectedTag] = useState<string>("all")
-
     // --- Fetching ---
     const fetchFiles = useCallback(async () => {
         if (!currentSpace) return
@@ -85,16 +79,9 @@ export default function LibraryPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        // Fetch Files with Tags
-        // Note: Make sure RLS Policies allow reading tags
         const { data, error } = await supabase
             .from('files')
-            .select(`
-                *,
-                file_tags (
-                    tags (name)
-                )
-            `)
+            .select('*')
             .eq('user_id', user.id)
             .eq('space_id', currentSpace.id)
             .order('type', { ascending: false })
@@ -111,13 +98,8 @@ export default function LibraryPage() {
                 parentId: f.parent_id,
                 storagePath: f.storage_path,
                 size: f.size_bytes ? formatBytes(f.size_bytes) : undefined,
-                tags: f.file_tags?.map((ft: any) => ft.tags?.name).filter(Boolean) || []
             }))
             setItems(mappedItems)
-
-            // Extract unique tags for filter
-            const allTags = Array.from(new Set(mappedItems.flatMap(i => i.tags || []))).sort()
-            setAvailableTags(allTags)
         }
         setLoading(false)
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +110,6 @@ export default function LibraryPage() {
             fetchFiles()
         } else {
             setItems([])
-            setAvailableTags([])
         }
     }, [fetchFiles, currentSpace])
 
@@ -188,28 +169,11 @@ export default function LibraryPage() {
     }
 
     // --- Filtering ---
-    // --- Filtering ---
     const filteredItems = items.filter(item => {
-        const matchesSearch = searchQuery ? item.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
-        const matchesFolder = item.parentId === currentFolderId
-
-        // Tag Filter Logic
-        // If searching, ignore folder hierarchy (show flat results). If browsing folders, respect hierarchy.
-        // BUT if filtering by tag, show ALL files with that tag regardless of folder? Usually yes.
-        const matchesTag = selectedTag === "all" || (item.tags && item.tags.includes(selectedTag))
-
-        if (selectedTag !== "all") {
-            // Tag mode: Flat list of matches
-            return matchesTag && matchesSearch
-        }
-
         if (searchQuery) {
-            // Search mode: Flat list
-            return matchesSearch
+            return item.name.toLowerCase().includes(searchQuery.toLowerCase())
         }
-
-        // Folder mode
-        return matchesFolder
+        return item.parentId === currentFolderId
     })
 
     // --- Actions ---
@@ -387,27 +351,6 @@ export default function LibraryPage() {
         }
     }
 
-    // --- AI Analysis ---
-    const handleAnalyze = async (item: FileSystemItem) => {
-        if (item.type !== 'file') return
-        if (!confirm(`¿Iniciar análisis estructural con IA para "${item.name}"? Esto sucederá en segundo plano.`)) return
-
-        try {
-            const res = await fetch('/api/analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fileId: item.id })
-            })
-
-            if (!res.ok) throw new Error("Error en el servicio de análisis")
-
-            alert("✅ Análisis completado. Los metadatos (marcadores, segmentos, etiquetas) se han guardado en la base de datos.")
-        } catch (e: any) {
-            console.error(e)
-            alert("Error al analizar: " + e.message)
-        }
-    }
-
     // Get all folders for Move Dialog (excluding current item tree conceptually, but flat list is easier)
     // We just filter out the item itself if it's a folder.
     const allFolders = items.filter(i => i.type === 'folder' && i.id !== itemToMove?.id)
@@ -495,20 +438,6 @@ export default function LibraryPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* Tag Filter */}
-                    <Select value={selectedTag} onValueChange={setSelectedTag}>
-                        <SelectTrigger className="w-[180px] h-9">
-                            <Tag className="h-4 w-4 mr-2 text-muted-foreground" />
-                            <SelectValue placeholder="Etiquetas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas las etiquetas</SelectItem>
-                            {availableTags.map(tag => (
-                                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -523,7 +452,7 @@ export default function LibraryPage() {
 
             {/* Breadcrumbs & Stats */}
             <div className="border-b pb-2">
-                {!searchQuery && selectedTag === 'all' ? (
+                {!searchQuery ? (
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
                         {/* Línea 1: Breadcrumb with horizontal scroll on mobile */}
                         <div className="flex items-center gap-1 text-sm text-muted-foreground overflow-x-auto scrollbar-hide">
@@ -553,9 +482,7 @@ export default function LibraryPage() {
                     </div>
                 ) : (
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
-                        <div className="text-sm text-muted-foreground">
-                            {selectedTag !== 'all' ? `Filtrado por: ${selectedTag}` : "Resultados de búsqueda"}
-                        </div>
+                        <div className="text-sm text-muted-foreground">Resultados de búsqueda</div>
                         <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3">
                             <span>{currentViewStats.folders} carpetas</span>
                             <span className="opacity-50">•</span>
@@ -573,7 +500,7 @@ export default function LibraryPage() {
                     {!loading && filteredItems.length === 0 && (
                         <div className="col-span-full py-12 flex flex-col items-center text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
                             <Folder className="h-10 w-10 mb-2 opacity-20" />
-                            <p>Carpeta vacía (o sin resultados)</p>
+                            <p>Carpeta vacía</p>
                         </div>
                     )}
 
@@ -586,7 +513,7 @@ export default function LibraryPage() {
                                 className="group relative flex flex-col items-center p-3 rounded-lg border bg-card hover:bg-accent/50 transition-all cursor-pointer aspect-square"
                                 onClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
                             >
-                                <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105 relative">
+                                <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105">
                                     {item.type === "folder" ? (
                                         <div className="relative">
                                             <Folder className="h-12 w-12 text-yellow-500 fill-yellow-500/20" />
@@ -597,24 +524,7 @@ export default function LibraryPage() {
                                             )}
                                         </div>
                                     ) : (
-                                        <div className="relative">
-                                            <FileText className="h-12 w-12 text-primary fill-primary/10" />
-                                            {/* Badge Overlay */}
-                                            {item.tags && item.tags.length > 0 && (
-                                                <div className="absolute -top-2 -right-3 flex flex-col items-end gap-0.5">
-                                                    {item.tags.slice(0, 1).map(tag => (
-                                                        <Badge key={tag} className="text-[9px] px-1 h-4 bg-purple-500/80 hover:bg-purple-500 whitespace-nowrap overflow-hidden max-w-[80px] text-ellipsis">
-                                                            {tag}
-                                                        </Badge>
-                                                    ))}
-                                                    {item.tags.length > 1 && (
-                                                        <Badge variant="secondary" className="text-[8px] px-1 h-3 opacity-80">
-                                                            +{item.tags.length - 1}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
+                                        <FileText className="h-12 w-12 text-primary fill-primary/10" />
                                     )}
                                 </div>
                                 <div className="w-full text-center mt-2 space-y-0.5">
@@ -652,14 +562,6 @@ export default function LibraryPage() {
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMove(item) }}>
                                             <FolderInput className="h-4 w-4 mr-2" /> Mover
                                         </DropdownMenuItem>
-                                        {item.type === 'file' && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAnalyze(item) }}>
-                                                    <Brain className="h-4 w-4 mr-2 text-purple-500" /> Analizar Estructura (IA)
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(item) }}>
                                             <Trash2 className="h-4 w-4 mr-2" /> Eliminar
@@ -722,13 +624,39 @@ export default function LibraryPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Smart File Viewer (Replaces old Preview) */}
-            <SmartFileViewer
-                isOpen={isPreviewOpen}
-                onClose={() => setIsPreviewOpen(false)}
-                fileId={previewItem?.id || ""}
-                fileName={previewItem?.name || ""}
-            />
+            {/* Preview Modal */}
+            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>{previewItem?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto min-h-[300px] bg-muted/20 p-4 rounded text-sm font-mono whitespace-pre-wrap border relative">
+                        <AnimatePresence mode="wait">
+                            {isLoadingPreview ? (
+                                <motion.div
+                                    key="loading"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute inset-0 flex items-center justify-center"
+                                >
+                                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="content"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 1.2, ease: "easeOut" }}
+                                    className="h-full"
+                                >
+                                    {previewContent}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

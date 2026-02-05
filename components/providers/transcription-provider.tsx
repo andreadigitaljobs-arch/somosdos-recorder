@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { useSpace } from "@/components/providers/space-provider"
 import { createClient } from "@/lib/supabase/client"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export type QueueItem = {
     id: string
@@ -140,6 +141,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                 if (useChunking) {
                     // === CHUNKED PROCESSING FOR LARGE FILES ===
+                    clearInterval(progressInterval) // STOP FAKE PROGRESS! We calculate real progress here.
+
                     let currentExtractMsg = getRandomMessage('extract')
                     updateItemStatus(pendingItem.id, 'processing', 5, undefined, undefined, currentExtractMsg)
 
@@ -150,7 +153,7 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     try {
                         chunks = await processFileIntoChunks(
                             pendingItem.file,
-                            3, // 3-minute chunks (Safe for 60s timeout)
+                            1, // 1-minute chunks (Bulletproof for Vercel 10s limit)
                             (stage, progress, details) => {
                                 if (stage === 'extract') {
                                     // Update progress but KEEP the same message to avoid flickering
@@ -162,7 +165,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                             }
                         )
                     } catch (error) {
-                        throw new Error(`Error procesando archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+                        // Short error for UI
+                        throw new Error(`Error procesando: ${error instanceof Error ? error.message.substring(0, 20) : '...'}`)
                     }
 
                     updateItemStatus(pendingItem.id, 'processing', 30, undefined, undefined, `Procesando ${chunks.length} segmentos...`)
@@ -173,61 +177,52 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                     for (let i = 0; i < chunks.length; i++) {
                         const chunk = chunks[i]
+                        // VALIDATION: Check for empty chunks from ffmpeg
+                        if (chunk.size === 0) {
+                            console.warn(`Chunk ${i + 1} is 0 bytes. Skipping.`);
+                            continue;
+                        }
+
                         const chunkProgress = 30 + ((i / chunks.length) * 65) // Map to 30-95%
 
-                        // Pick a fun message for this chunk and stick with it
-                        // Add segment info to the message so it's informative AND fun
-                        const baseMsg = getRandomMessage('transcribe')
-                        const msg = `${baseMsg} (${i + 1}/${chunks.length})`
+                        // 1. DIRECT UPLOAD TO SERVER ACTION (Bypassing Supabase for Speed)
+                        updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Analizando IA (${i + 1}/${chunks.length})...`)
 
-                        updateItemStatus(
-                            pendingItem.id,
-                            'processing',
-                            Math.round(chunkProgress),
-                            undefined,
-                            undefined,
-                            msg
-                        )
+                        // Convert Blob to Base64
+                        const base64Promise = new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                const result = reader.result as string;
+                                const base64 = result.split(',')[1];
+                                resolve(base64);
+                            }
+                            reader.onerror = reject;
+                            reader.readAsDataURL(chunk);
+                        });
 
-                        // Upload chunk to Supabase
-                        const chunkPath = `temp_transcriptions/${Date.now()}_chunk_${i}.mp3`
-                        const { error: uploadError } = await supabase.storage
-                            .from('library_files')
-                            .upload(chunkPath, chunk, {
-                                cacheControl: '3600',
-                                upsert: false
-                            })
+                        const base64Data = await base64Promise;
 
-                        if (uploadError) {
-                            throw new Error(`Error subiendo segmento ${i + 1}: ${uploadError.message}`)
-                        }
+                        const prompt = "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
 
-                        // Get signed URL
-                        const { data, error: urlError } = await supabase.storage
-                            .from('library_files')
-                            .createSignedUrl(chunkPath, 3600)
+                        // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
+                        const genAI = new GoogleGenerativeAI(apiKey);
+                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-                        if (urlError || !data?.signedUrl) {
-                            await supabase.storage.from('library_files').remove([chunkPath])
-                            throw new Error(`Error generando URL para segmento ${i + 1}`)
-                        }
+                        const result = await model.generateContent([
+                            prompt,
+                            {
+                                inlineData: {
+                                    mimeType: "audio/mp3",
+                                    data: base64Data
+                                }
+                            }
+                        ]);
 
-                        // Transcribe chunk
-                        const result = await transcribeAudio({
-                            fileUrl: data.signedUrl,
-                            apiKey,
-                            mimeType: 'audio/mpeg',
-                            originalName: `chunk_${i}.mp3`
-                        })
+                        const text = result.response.text();
 
-                        // Clean up chunk
-                        await supabase.storage.from('library_files').remove([chunkPath])
+                        if (!text) throw new Error("Empty response from AI");
 
-                        if (result.error) {
-                            throw new Error(`Error transcribiendo segmento ${i + 1}: ${result.error}`)
-                        }
-
-                        transcriptions.push(result.transcription || '')
+                        transcriptions.push(text)
                     }
 
                     // Step 3: Combine transcriptions
