@@ -138,9 +138,9 @@ export default function QuizPage() {
                 })
             }))
 
-            // Timeout Controller to prevent infinite loading (25s limit)
+            // Timeout Controller to prevent infinite loading (5 minutes limit for Deep Search)
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 300s timeout
 
             const response = await fetch('/api/quiz', {
                 method: 'POST',
