@@ -125,13 +125,27 @@ export default function TranscriptorPage() {
     }
 
     // Auto-refresh folders every 30s to keep connection alive
+    // Auto-refresh folders every 30s AND on window focus
     useEffect(() => {
         if (currentSpace) {
-            fetchFolders(true) // Initial fetch (silent or not? Maybe silent if first load implies hydration)
+            fetchFolders(true)
+
+            // 1. Interval
             const interval = setInterval(() => {
                 fetchFolders(true)
             }, 30000)
-            return () => clearInterval(interval)
+
+            // 2. Focus Handler
+            const handleFocus = () => {
+                // Force refresh when tab becomes active
+                fetchFolders(true)
+            }
+            window.addEventListener('focus', handleFocus)
+
+            return () => {
+                clearInterval(interval)
+                window.removeEventListener('focus', handleFocus)
+            }
         }
     }, [currentSpace, fetchFolders])
 
