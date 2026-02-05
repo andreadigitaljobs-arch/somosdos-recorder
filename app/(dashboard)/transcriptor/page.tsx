@@ -28,15 +28,17 @@ export default function TranscriptorPage() {
     const [saveFileName, setSaveFileName] = useState("")
     const [folders, setFolders] = useState<FolderItem[]>([])
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
-    const [showSuccessToast, setShowSuccessToast] = useState(false)
+    const [showToast, setShowToast] = useState(false)
+    const [toastStatus, setToastStatus] = useState<'loading' | 'success' | 'error'>('loading')
+    const [toastMessage, setToastMessage] = useState("")
 
-    // Toast Auto-Dismiss
+    // Toast Auto-Dismiss (only for success/error)
     useEffect(() => {
-        if (showSuccessToast) {
-            const timer = setTimeout(() => setShowSuccessToast(false), 3000)
+        if (showToast && toastStatus !== 'loading') {
+            const timer = setTimeout(() => setShowToast(false), 3000)
             return () => clearTimeout(timer)
         }
-    }, [showSuccessToast])
+    }, [showToast, toastStatus])
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState("")
 
@@ -217,20 +219,34 @@ export default function TranscriptorPage() {
         }
     }
 
-    const [isSaving, setIsSaving] = useState(false)
+    // --- Optimistic Save Logic ---
+    const [isSaving, setIsSaving] = useState(false) // Restore state for batch/compatibility
 
     const confirmSave = async () => {
         if (!itemToSave) return
+
+        // 1. Optimistic Close
+        setIsSaveModalOpen(false)
+
+        // 2. Show Loading Toast
+        setToastStatus('loading')
+        setToastMessage("Guardando transcripción...")
+        setShowToast(true)
+
         try {
-            setIsSaving(true)
+            // 3. Background Save
             await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
-            setShowSuccessToast(true)
-            setIsSaveModalOpen(false)
+
+            // 4. Update Toast to Success
+            setToastStatus('success')
+            setToastMessage("¡Guardado exitosamente!")
+
         } catch (error: any) {
             console.error("Error guardando:", error)
-            alert(`Error al guardar: ${error.message}`)
-        } finally {
-            setIsSaving(false)
+            setToastStatus('error')
+            setToastMessage(`Error: ${error.message}`)
+            // Keep error toast visible longer or let user dismiss? 
+            // Auto-dismiss handles it in 3s
         }
     }
 
@@ -243,22 +259,30 @@ export default function TranscriptorPage() {
 
     const confirmBatchSave = async () => {
         const completedItems = queue.filter(i => i.status === 'completed')
-        if (completedItems.length === 0 || !currentSpace) return // Added currentSpace check
+        if (completedItems.length === 0 || !currentSpace) return
+
+        // Optimistic UI for Batch
+        setIsBatchSaveModalOpen(false)
+        setToastStatus('loading')
+        setToastMessage(`Guardando ${completedItems.length} archivos...`)
+        setShowToast(true)
 
         try {
             let targetId = selectedFolderId
 
             // If creating a new folder for this batch
             if (isCreatingFolder && newFolderName) {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (!user) return
+                const { data: { session } } = await supabase.auth.getSession()
+                if (!session?.user) throw new Error("No autenticado")
+
                 const { data, error } = await supabase.from('files').insert({
-                    user_id: user.id,
+                    user_id: session.user.id,
                     space_id: currentSpace.id,
-                    parent_id: selectedFolderId, // Can be nested
+                    parent_id: selectedFolderId,
                     name: newFolderName,
                     type: 'folder'
                 }).select().single()
+
                 if (error) throw error
                 targetId = data.id
             }
@@ -274,14 +298,14 @@ export default function TranscriptorPage() {
                 }
             }
 
-            alert(`Guardado completado: ${successCount}/${completedItems.length} archivos.`)
-            setShowSuccessToast(true)
-            setIsBatchSaveModalOpen(false)
+            setToastStatus('success')
+            setToastMessage(`Guardado completado: ${successCount}/${completedItems.length}`)
             setIsCreatingFolder(false)
             setNewFolderName("")
 
         } catch (error: any) {
-            alert("Error en guardado masivo: " + error.message)
+            setToastStatus('error')
+            setToastMessage("Error en guardado masivo: " + error.message)
         }
     }
 
@@ -303,19 +327,26 @@ export default function TranscriptorPage() {
 
     return (
         <div className="space-y-4 h-full flex flex-col relative">
-            {/* Custom Success Toast */}
-            <AnimatePresence>
-                {showSuccessToast && (
+            {/* Custom Status Toast */}
+            <AnimatePresence mode="wait">
+                {showToast && (
                     <motion.div
-                        initial={{ opacity: 0, y: -20, x: "50%" }}
-                        animate={{ opacity: 1, y: 0, x: "50%" }}
-                        exit={{ opacity: 0, y: -20, x: "50%" }}
-                        className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-emerald-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md bg-opacity-95 border border-emerald-400/50"
+                        key={toastStatus} // force re-render on status change for animation
+                        initial={{ opacity: 0, y: -20, x: "-50%" }}
+                        animate={{ opacity: 1, y: 0, x: "-50%" }}
+                        exit={{ opacity: 0, y: -20, x: "-50%" }}
+                        className={`fixed top-6 left-1/2 pixel-perfect-center z-[100] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md bg-opacity-95 border transition-colors duration-300
+                            ${toastStatus === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' :
+                                toastStatus === 'error' ? 'bg-red-500 border-red-400 text-white' :
+                                    'bg-indigo-500 border-indigo-400 text-white'}`}
+                        style={{ transform: "translateX(-50%)" }}
                     >
                         <div className="bg-white/20 p-1 rounded-full">
-                            <CheckCircle className="h-4 w-4 text-white" />
+                            {toastStatus === 'success' && <CheckCircle className="h-4 w-4 text-white" />}
+                            {toastStatus === 'error' && <AlertCircle className="h-4 w-4 text-white" />}
+                            {toastStatus === 'loading' && <Loader2 className="h-4 w-4 text-white animate-spin" />}
                         </div>
-                        <span className="font-medium text-sm">¡Guardado exitosamente!</span>
+                        <span className="font-medium text-sm">{toastMessage}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
