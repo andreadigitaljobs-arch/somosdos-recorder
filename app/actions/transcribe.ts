@@ -9,6 +9,9 @@ import { finished } from "stream/promises";
 import path from "path";
 import os from "os";
 
+// Set max execution time to 60 seconds (Vercel Limit)
+export const maxDuration = 60;
+
 // Types
 type TranscribeParams = {
     fileUrl: string;
@@ -85,9 +88,8 @@ export async function transcribeAudio(params: TranscribeParams) {
 
         // 3. Generate Content with Fallback Strategy
         const modelsToTry = [
-            "gemini-2.0-flash-001",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash"
+            "gemini-2.0-flash",
+            "gemini-1.5-flash"
         ];
 
         let lastError = null;
