@@ -89,9 +89,9 @@ export default function LibraryPage() {
                 return
             }
 
-            // Timeout Logic
+            // Timeout Logic - Extended to 60s for background stability
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+                setTimeout(() => reject(new Error("TIMEOUT")), 60000)
             );
 
             const fetchPromise = supabase
