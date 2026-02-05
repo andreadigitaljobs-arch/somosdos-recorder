@@ -295,15 +295,27 @@ export default function TranscriptorPage() {
                 targetId = data.id
             }
 
-            // Loop and Save
-            let successCount = 0
-            for (const item of completedItems) {
+            // PARALLEL BATCH SAVE
+            // Run all saves simultaneously so total timeout is max ~15s, not 15s * N
+            const savePromises = completedItems.map(async (item) => {
                 try {
                     await saveItemToLibrary(item, targetId)
-                    successCount++
-                } catch (e) {
-                    console.error(`Failed to save ${item.file.name}`, e)
+                    return { status: 'fulfilled', item }
+                } catch (error) {
+                    console.error(`Failed to save ${item.file.name}`, error)
+                    return { status: 'rejected', item, error }
                 }
+            })
+
+            const results = await Promise.all(savePromises)
+
+            // Count success
+            const successCount = results.filter(r => r.status === 'fulfilled').length
+            const failures = results.filter(r => r.status === 'rejected')
+
+            if (failures.length > 0) {
+                // Log or handle partial failures if needed
+                console.warn("Algunos archivos no se guardaron:", failures)
             }
 
             setToastStatus('success')
