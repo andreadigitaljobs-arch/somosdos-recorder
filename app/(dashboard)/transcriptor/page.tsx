@@ -66,24 +66,7 @@ export default function TranscriptorPage() {
 
     const [loadingFolders, setLoadingFolders] = useState(false)
 
-    // --- Bulk Selection State ---
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-    const isSelectionMode = selectedIds.size > 0
 
-    const toggleSelection = (id: string, event?: React.MouseEvent) => {
-        event?.stopPropagation()
-        const newSet = new Set(selectedIds)
-        if (newSet.has(id)) newSet.delete(id)
-        else newSet.add(id)
-        setSelectedIds(newSet)
-    }
-
-    const clearSelection = () => setSelectedIds(new Set())
-
-    const handleSelectAll = () => {
-        if (selectedIds.size === filteredItems.length) clearSelection()
-        else setSelectedIds(new Set(filteredItems.map(i => i.id)))
-    }
 
     // --- Save Modal Logic ---
     const openSaveModal = (item: QueueItem) => {
