@@ -522,6 +522,40 @@ export default function LibraryPage() {
                         />
                     </div>
                 </div>
+
+                {/* Bulk Action Bar - Appears when items are selected */}
+                <AnimatePresence>
+                    {isSelectionMode && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="bg-primary/5 border rounded-lg p-2 px-4 flex items-center justified-between gap-4 overflow-hidden"
+                        >
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                    {selectedIds.size}
+                                </span>
+                                <span>seleccionado{selectedIds.size !== 1 && 's'}</span>
+                                <Button variant="ghost" size="sm" onClick={handleSelectAll} className="h-7 text-xs ml-2">
+                                    {selectedIds.size === filteredItems.length ? "Deseleccionar" : "Todos"}
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-2 ml-auto">
+                                <Button size="sm" variant="secondary" onClick={() => setIsMoveOpen(true)} className="h-8 shadow-sm">
+                                    <CornerUpLeft className="h-4 w-4 mr-2" /> Mover
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 shadow-sm">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={clearSelection} className="h-8 w-8 ml-2">
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Breadcrumbs & Stats */}
@@ -584,9 +618,30 @@ export default function LibraryPage() {
                         return (
                             <div
                                 key={item.id}
-                                className="group relative flex flex-col items-center p-3 rounded-lg border bg-card hover:bg-accent/50 transition-all cursor-pointer aspect-square"
-                                onClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
+                                className={`group relative flex flex-col items-center p-3 rounded-lg border transition-all cursor-pointer aspect-square
+                                    ${selectedIds.has(item.id)
+                                        ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary'
+                                        : 'bg-card hover:bg-accent/50 hover:shadow-md'}`}
+                                onClick={() => {
+                                    if (isSelectionMode) toggleSelection(item.id)
+                                    else item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)
+                                }}
+                                onDoubleClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
                             >
+                                {/* Selection Checkbox (Visible on Hover or Selected) */}
+                                <div
+                                    className={`absolute top-2 left-2 z-10 transition-opacity duration-200 
+                                        ${selectedIds.has(item.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                >
+                                    <div
+                                        className={`w-5 h-5 rounded border shadow-sm flex items-center justify-center
+                                            ${selectedIds.has(item.id) ? 'bg-primary border-primary text-primary-foreground' : 'bg-background/80 border-muted-foreground/50 hover:border-primary'}`}
+                                        onClick={(e) => toggleSelection(item.id, e)}
+                                    >
+                                        {selectedIds.has(item.id) && <Check className="h-3.5 w-3.5" />}
+                                    </div>
+                                </div>
+
                                 <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105">
                                     {item.type === "folder" ? (
                                         <div className="relative">
