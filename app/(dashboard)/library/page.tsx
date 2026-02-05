@@ -380,6 +380,33 @@ export default function LibraryPage() {
         }
     }
 
+    // --- Bulk Operations ---
+    const handleBulkDelete = async () => {
+        if (!confirm(`¿Estás seguro de eliminar ${selectedIds.size} elementos?`)) return
+
+        try {
+            const itemsToDelete = items.filter(i => selectedIds.has(i.id))
+            const filePaths = itemsToDelete
+                .filter(i => i.type === 'file' && i.storagePath)
+                .map(i => i.storagePath!)
+
+            // 1. Delete files from Storage in batch
+            if (filePaths.length > 0) {
+                const { error: storageError } = await supabase.storage.from('library_files').remove(filePaths)
+                if (storageError) console.error("Error borrando archivos de storage:", storageError)
+            }
+
+            // 2. Delete rows from DB
+            const { error } = await supabase.from('files').delete().in('id', Array.from(selectedIds))
+            if (error) throw error
+
+            fetchFiles()
+            clearSelection()
+        } catch (e: any) {
+            alert("Error al eliminar masivamente: " + e.message)
+        }
+    }
+
     // --- Move ---
     const openMove = (item: FileSystemItem) => {
         setItemToMove(item)
@@ -388,8 +415,34 @@ export default function LibraryPage() {
     }
 
     const confirmMove = async () => {
+        // Bulk Mode
+        if (isSelectionMode) {
+            const itemsToMove = items.filter(i => selectedIds.has(i.id))
+
+            // Check for cyclic moves
+            for (const item of itemsToMove) {
+                if (item.type === 'folder' && item.id === targetFolderId) {
+                    alert(`No puedes mover la carpeta "${item.name}" dentro de sí misma.`)
+                    return
+                }
+                // TODO: Deep cyclic check for children (moving Parent into Child) - Skipped for now
+            }
+
+            const { error } = await supabase.from('files')
+                .update({ parent_id: targetFolderId })
+                .in('id', Array.from(selectedIds))
+
+            if (error) alert("Error al mover: " + error.message)
+            else {
+                fetchFiles()
+                setIsMoveOpen(false)
+                clearSelection()
+            }
+            return
+        }
+
+        // Single Mode
         if (!itemToMove) return
-        // Check for cyclic move (folder into itself)
         if (itemToMove.type === 'folder' && targetFolderId === itemToMove.id) {
             alert("No puedes mover una carpeta dentro de sí misma")
             return
@@ -424,9 +477,17 @@ export default function LibraryPage() {
         }
     }
 
-    // Get all folders for Move Dialog (excluding current item tree conceptually, but flat list is easier)
-    // We just filter out the item itself if it's a folder.
-    const allFolders = items.filter(i => i.type === 'folder' && i.id !== itemToMove?.id)
+    // Get all folders for Move Dialog (excluding current item tree)
+    const allFolders = items.filter(i => {
+        // Must be a folder
+        if (i.type !== 'folder') return false
+        // Single mode: Excluding self
+        if (itemToMove && i.id === itemToMove.id) return false
+        // Bulk mode: Exclude any selected folder
+        if (isSelectionMode && selectedIds.has(i.id)) return false
+
+        return true
+    })
 
 
     // --- Helper: Count Children (Immediate) ---
