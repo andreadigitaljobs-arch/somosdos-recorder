@@ -2,15 +2,27 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Folder, Mic, Brain, Activity } from "lucide-react"
+import { FileText, Folder, Mic, Brain, Activity, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
+import { formatDistanceToNow } from "date-fns"
+import { es } from "date-fns/locale"
+
+type ActivityItem = {
+    id: string
+    type: 'transcription' | 'quiz'
+    title: string
+    date: string
+    icon: any
+    color: string
+}
 
 export default function DashboardPage() {
     const supabase = createClient()
     const { currentSpace } = useSpace()
 
     const [loading, setLoading] = useState(true)
+    const [activities, setActivities] = useState<ActivityItem[]>([])
     const [counts, setCounts] = useState({
         files: 0,
         folders: 0,
@@ -56,6 +68,44 @@ export default function DashboardPage() {
                     transcriptions: transcriptionsCount || 0,
                     quizzes: quizzesCount || 0
                 })
+
+                // 3. Recent Activity Feed
+                const { data: recentTranscriptions } = await supabase
+                    .from('transcriptions')
+                    .select('id, created_at, metadata')
+                    .eq('metadata->>space_id', currentSpace.id)
+                    .order('created_at', { ascending: false })
+                    .limit(5)
+
+                const { data: recentQuizzes } = await supabase
+                    .from('quizzes')
+                    .select('id, created_at, title, results')
+                    .eq('results->>space_id', currentSpace.id)
+                    .order('created_at', { ascending: false })
+                    .limit(5)
+
+                const unifiedActivity: ActivityItem[] = [
+                    ...(recentTranscriptions || []).map(t => ({
+                        id: t.id,
+                        type: 'transcription' as const,
+                        title: (t.metadata as any)?.filename || 'Audio Transcrito',
+                        date: t.created_at,
+                        icon: Mic,
+                        color: "text-purple-500 bg-purple-500/10"
+                    })),
+                    ...(recentQuizzes || []).map(q => ({
+                        id: q.id,
+                        type: 'quiz' as const,
+                        title: q.title || 'Quiz Generado',
+                        date: q.created_at,
+                        icon: Brain,
+                        color: "text-pink-500 bg-pink-500/10"
+                    }))
+                ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 5)
+
+                setActivities(unifiedActivity)
+
             } catch (error) {
                 console.error("Error fetching stats:", error)
             } finally {
@@ -108,12 +158,40 @@ export default function DashboardPage() {
                         <CardTitle className="text-lg">Actividad Reciente</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[200px] w-full flex items-center justify-center bg-accent/20 rounded-lg border border-dashed border-border/60">
-                            <div className="text-center text-muted-foreground">
-                                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                <span className="text-sm">Sin actividad reciente</span>
+                        {loading ? (
+                            <div className="space-y-3">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="h-12 w-full bg-accent/10 animate-pulse rounded-md" />
+                                ))}
                             </div>
-                        </div>
+                        ) : activities.length === 0 ? (
+                            <div className="h-[200px] w-full flex items-center justify-center bg-accent/20 rounded-lg border border-dashed border-border/60">
+                                <div className="text-center text-muted-foreground">
+                                    <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                    <span className="text-sm">Sin actividad reciente</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {activities.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-accent/40 transition-colors group">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-full ${item.color}`}>
+                                                <item.icon className="h-4 w-4" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium leading-none">{item.title}</span>
+                                                <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {/* Optional: Add link button if needed */}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
