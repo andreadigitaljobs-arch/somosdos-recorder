@@ -208,8 +208,14 @@ export default function TranscriptorPage() {
             for (let i = 0; i < 5; i++) {
                 try {
                     await new Promise(r => setTimeout(r, 2000)) // Wait 2s
-                    const { data, error } = await supabase.auth.refreshSession()
-                    if (data.session && !error) {
+
+                    // Race refresh against 4s timeout prevents infinite hang
+                    const refreshPromise = supabase.auth.refreshSession()
+                    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("REFRESH_TIMEOUT")), 4000))
+
+                    const { data, error } = await Promise.race([refreshPromise, timeoutPromise]) as any
+
+                    if (data?.session && !error) {
                         recovered = true
                         break
                     }
