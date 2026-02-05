@@ -73,11 +73,17 @@ export default function LibraryPage() {
 
     // --- Fetching ---
     const fetchFiles = useCallback(async () => {
-        if (!currentSpace) return
+        if (!currentSpace) {
+            setLoading(false)
+            return
+        }
         if (items.length === 0) setLoading(true)
 
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        if (!user) {
+            setLoading(false)
+            return
+        }
 
         const { data, error } = await supabase
             .from('files')
@@ -110,6 +116,7 @@ export default function LibraryPage() {
             fetchFiles()
         } else {
             setItems([])
+            setLoading(false) // Fix constant loading state on initial load
         }
     }, [fetchFiles, currentSpace])
 
