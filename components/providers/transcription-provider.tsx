@@ -236,13 +236,27 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
 
                     updateItemStatus(pendingItem.id, 'processing', 40, undefined, undefined, getRandomMessage('transcribe'))
 
+                    // SIMULATED PROGRESS: Start advancing from 40% to 90% while waiting
+                    let currentSimulatedProgress = 40
+                    const progressInterval = setInterval(() => {
+                        currentSimulatedProgress += (Math.random() * 2) // Increment slightly randomly
+                        if (currentSimulatedProgress > 95) currentSimulatedProgress = 95 // Cap at 95%
+                        updateItemStatus(pendingItem.id, 'processing', Math.round(currentSimulatedProgress))
+                    }, 800) // Update every 800ms
+
                     const { transcribeAudio } = await safeImport(() => import("@/app/actions/transcribe"))
-                    const result = await transcribeAudio({
-                        fileBase64: base64Data, // Send Full File
-                        apiKey: localKey,
-                        mimeType: pendingItem.file.type || 'audio/mp3',
-                        originalName: safeName
-                    })
+
+                    let result
+                    try {
+                        result = await transcribeAudio({
+                            fileBase64: base64Data, // Send Full File
+                            apiKey: localKey,
+                            mimeType: pendingItem.file.type || 'audio/mp3',
+                            originalName: safeName
+                        })
+                    } finally {
+                        clearInterval(progressInterval) // Stop animation
+                    }
 
                     if (result.error) {
                         throw new Error(`Error Servidor: ${result.error}`)
