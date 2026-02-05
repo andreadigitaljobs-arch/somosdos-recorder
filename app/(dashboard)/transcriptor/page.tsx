@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -51,7 +51,7 @@ export default function TranscriptorPage() {
     const [previewText, setPreviewText] = useState("")
 
     const { currentSpace } = useSpace()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
     // --- File Handling ---
     const onDrop = (acceptedFiles: File[]) => {
@@ -193,12 +193,25 @@ export default function TranscriptorPage() {
         if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // Use getSession for faster, local validation to avoid timeouts
+        // 0. STRICT CONNECTIVITY CHECK (Ping)
+        // Before starting heavy uploads, ensure we have a working connection
+        try {
+            const pintTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("PING_TIMEOUT")), 3000))
+            await Promise.race([supabase.auth.getUser(), pintTimeout])
+        } catch (e) {
+            // If ping fails, force hard refresh of session
+            console.warn("Connection appears dead, refreshing...", e)
+            const { error: refreshError, data } = await supabase.auth.refreshSession()
+            if (refreshError || !data.session) {
+                throw new Error("Conexión perdida. Por favor recarga la página (F5) para reconectar.")
+            }
+        }
+
+        // 1. Standard Session Validation
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-        // Explicitly check and try to refresh if needed
         if (sessionError || !session?.user) {
-            console.warn("Session may be expired, attempting refresh...")
+            console.warn("Session expired, refreshing...")
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
             if (refreshError || !refreshData.session) {
                 throw new Error("Tu sesión ha expirado. Por favor recarga la página.")
@@ -233,9 +246,9 @@ export default function TranscriptorPage() {
         }).select().single()
 
         try {
-            // SAFETY TIMEOUT: 15 seconds max
+            // SAFETY TIMEOUT - Extended to 5 minutes to allow background completion
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Tiempo de espera agotado (15s). Verifica tu conexión.")), 15000)
+                setTimeout(() => reject(new Error("La operación tardó demasiado (Timeout 5min).")), 300000)
             )
 
             const [uploadResult, insertResult] = await Promise.race([
