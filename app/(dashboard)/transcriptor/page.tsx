@@ -87,7 +87,8 @@ export default function TranscriptorPage() {
     const fetchFolders = async (silent = false) => {
         if (!currentSpace) return
         if (!silent) setLoadingFolders(true)
-        if (silent) setConnectionStatus('reconnecting')
+        // Ensure we stay 'connected' visually during routine checks unless we actually fail
+        // if (silent) setConnectionStatus('reconnecting') <--- REMOVED to prevent flashing
 
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
