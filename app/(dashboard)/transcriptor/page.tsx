@@ -76,21 +76,37 @@ export default function TranscriptorPage() {
             return
         }
 
-        const { data, error } = await supabase
-            .from('files')
-            .select('id, name, parent_id')
-            .eq('user_id', user.id)
-            .eq('space_id', currentSpace.id)
-            .eq('type', 'folder')
-            .order('name', { ascending: true })
-            .limit(2000) // RAISED LIMIT
+        try {
+            // Timeout promise to prevent hanging
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Tiempo de espera agotado")), 8000)
+            );
 
-        if (error) {
+            const fetchPromise = supabase
+                .from('files')
+                .select('id, name, parent_id')
+                .eq('user_id', user.id)
+                .eq('space_id', currentSpace.id)
+                .eq('type', 'folder')
+                .order('name', { ascending: true })
+                .limit(2000)
+
+            // Race against timeout
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
+
+            if (error) throw error
+            if (data) setFolders(data)
+
+        } catch (error: any) {
             console.error(error)
-            alert("Error cargando carpetas. Intenta refrescar.")
+            alert(error.message === "Tiempo de espera agotado"
+                ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
+                : "Error cargando carpetas. Verifica tu conexión."
+            )
+        } finally {
+            setLoadingFolders(false)
         }
-        if (data) setFolders(data)
-        setLoadingFolders(false)
     }
 
     const handleCreateFolder = async () => {

@@ -77,25 +77,35 @@ export default function LibraryPage() {
             setLoading(false)
             return
         }
+        // Only set loading if empty, but for refresh we might want visual indicator elsewhere
         if (items.length === 0) setLoading(true)
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-            setLoading(false)
-            return
-        }
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                setLoading(false)
+                return
+            }
 
-        const { data, error } = await supabase
-            .from('files')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('space_id', currentSpace.id)
-            .order('type', { ascending: false })
-            .order('name', { ascending: true })
+            // Timeout Logic
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+            );
 
-        if (error) {
-            console.error('Error fetching files:', error)
-        } else {
+            const fetchPromise = supabase
+                .from('files')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('space_id', currentSpace.id)
+                .order('type', { ascending: false })
+                .order('name', { ascending: true })
+                .limit(2000) // Added Safety Limit
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
+
+            if (error) throw error
+
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const mappedItems: FileSystemItem[] = (data || []).map((f: any) => ({
                 id: f.id,
@@ -106,9 +116,16 @@ export default function LibraryPage() {
                 size: f.size_bytes ? formatBytes(f.size_bytes) : undefined,
             }))
             setItems(mappedItems)
+
+        } catch (error: any) {
+            console.error('Error fetching files:', error)
+            if (error.message === 'TIMEOUT') {
+                // Keep existing items if timeout, just stop loading
+                console.warn("Library fetch timed out")
+            }
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [supabase, currentSpace]) // Removed items.length to avoid loops
 
     useEffect(() => {
