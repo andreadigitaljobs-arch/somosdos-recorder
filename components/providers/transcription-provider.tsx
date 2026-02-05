@@ -234,13 +234,13 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     });
                     const base64Data = await base64Promise;
 
-                    updateItemStatus(pendingItem.id, 'processing', 40, undefined, undefined, getRandomMessage('transcribe'))
+                    updateItemStatus(pendingItem.id, 'processing', 15, undefined, undefined, getRandomMessage('transcribe'))
 
-                    // SIMULATED PROGRESS: Start advancing from 40% to 90% while waiting
-                    let currentSimulatedProgress = 40
+                    // SIMULATED PROGRESS: Start advancing from 15% to 98% while waiting
+                    let currentSimulatedProgress = 15
                     const progressInterval = setInterval(() => {
-                        currentSimulatedProgress += (Math.random() * 2) // Increment slightly randomly
-                        if (currentSimulatedProgress > 95) currentSimulatedProgress = 95 // Cap at 95%
+                        currentSimulatedProgress += (Math.random() * 1.5) // Slower increment to last longer
+                        if (currentSimulatedProgress > 98) currentSimulatedProgress = 98 // Cap at 98%
                         updateItemStatus(pendingItem.id, 'processing', Math.round(currentSimulatedProgress))
                     }, 800) // Update every 800ms
 
