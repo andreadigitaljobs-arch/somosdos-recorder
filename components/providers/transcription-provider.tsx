@@ -205,22 +205,43 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                         const prompt = "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
 
                         // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
+                        // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
                         const genAI = new GoogleGenerativeAI(apiKey);
-                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
-                        const result = await model.generateContent([
-                            prompt,
-                            {
-                                inlineData: {
-                                    mimeType: "audio/mp3",
-                                    data: base64Data
+                        // Fallback strategy: Try multiple models if one is not found (404)
+                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-pro", "gemini-1.5-flash-8b"];
+                        let text = "";
+                        let success = false;
+                        let lastError;
+
+                        for (const modelName of modelsToTry) {
+                            try {
+                                console.log(`Attempting transcription with model: ${modelName}`);
+                                const model = genAI.getGenerativeModel({ model: modelName });
+
+                                const result = await model.generateContent([
+                                    prompt,
+                                    {
+                                        inlineData: {
+                                            mimeType: "audio/mp3",
+                                            data: base64Data
+                                        }
+                                    }
+                                ]);
+
+                                text = result.response.text();
+                                if (text) {
+                                    success = true;
+                                    break; // Exit loop on success
                                 }
+                            } catch (error: any) {
+                                console.warn(`Failed with model ${modelName}:`, error.message);
+                                lastError = error;
+                                // If 404, continue. If 401 (Auth), probably all will fail, but worth trying.
                             }
-                        ]);
+                        }
 
-                        const text = result.response.text();
-
-                        if (!text) throw new Error("Empty response from AI");
+                        if (!success || !text) throw lastError || new Error("No compatible Gemini model found for your key/region.");
 
                         transcriptions.push(text)
                     }
