@@ -193,21 +193,44 @@ export default function TranscriptorPage() {
         if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // 0. STRICT CONNECTIVITY CHECK (Ping)
-        // Before starting heavy uploads, ensure we have a working connection
+        // 0. STRICT CONNECTIVITY CHECK (Ping + Auto-Repair)
         try {
             const pintTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("PING_TIMEOUT")), 3000))
             await Promise.race([supabase.auth.getUser(), pintTimeout])
         } catch (e) {
-            // If ping fails, force hard refresh of session
-            console.warn("Connection appears dead, refreshing...", e)
-            const { error: refreshError, data } = await supabase.auth.refreshSession()
-            if (refreshError || !data.session) {
-                throw new Error("Conexión perdida. Por favor recarga la página (F5) para reconectar.")
+            console.warn("Connection dead, attempting aggressive recovery...", e)
+            setToastStatus('loading')
+            setToastMessage("Recuperando conexión...")
+            setShowToast(true)
+
+            // Retry Loop: Give the network ~10s to wake up (5 attempts x 2s)
+            let recovered = false
+            for (let i = 0; i < 5; i++) {
+                try {
+                    await new Promise(r => setTimeout(r, 2000)) // Wait 2s
+                    const { data, error } = await supabase.auth.refreshSession()
+                    if (data.session && !error) {
+                        recovered = true
+                        break
+                    }
+                } catch (retryError) {
+                    console.log(`Recovery attempt ${i + 1} failed`)
+                }
             }
+
+            if (!recovered) {
+                setToastStatus('error')
+                setToastMessage("No se pudo reconectar")
+                throw new Error("Conexión perdida irremediablemente. Por favor recarga (F5).")
+            }
+
+            // If recovered, show brief success and continue
+            setToastStatus('success')
+            setToastMessage("Conexión recuperada")
+            await new Promise(r => setTimeout(r, 1000))
         }
 
-        // 1. Standard Session Validation
+        // 1. Standard Session Validation (Double check after recovery)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (sessionError || !session?.user) {
