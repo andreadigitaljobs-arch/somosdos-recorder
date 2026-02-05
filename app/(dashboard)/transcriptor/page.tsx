@@ -161,39 +161,39 @@ export default function TranscriptorPage() {
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
         // Timeout helper
-        const withTimeout = async<T>(promise: Promise<T>, ms = 15000, errorMsg = "La operación tardó demasiado"): Promise<T> => {
+        async function withTimeout<T>(promise: Promise<T>, ms = 15000, errorMsg = "La operación tardó demasiado"): Promise<T> {
             const timeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error(errorMsg)), ms)
-                )
-                return Promise.race([promise, timeout])
+            )
+            return Promise.race([promise, timeout])
         }
 
-                const {data: {user} } = await withTimeout(supabase.auth.getUser(), 5000, "Error de autenticación (timeout)")
-                if (!user) throw new Error("No usuario autenticado")
+        const { data: { user } } = await withTimeout(supabase.auth.getUser(), 5000, "Error de autenticación (timeout)")
+        if (!user) throw new Error("No usuario autenticado")
 
-                // Ensure .txt extension
-                const fullFileName = customName ? customName.trim() : item.file.name
-                const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
+        // Ensure .txt extension
+        const fullFileName = customName ? customName.trim() : item.file.name
+        const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
 
-                // SANITIZATION
-                const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
-                const filePath = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${sanitizedName}`
+        // SANITIZATION
+        const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const filePath = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${sanitizedName}`
 
-                const blob = new Blob([item.transcript], {type: 'text/plain' })
-                const fileObj = new File([blob], finalName, {type: 'text/plain' })
+        const blob = new Blob([item.transcript], { type: 'text/plain' })
+        const fileObj = new File([blob], finalName, { type: 'text/plain' })
 
-                // Upload with timeout
-                const {error: uploadError } = await withTimeout(
-                supabase.storage.from('library_files').upload(filePath, fileObj),
-                20000,
-                "La subida del archivo tardó demasiado. Revisa tu conexión."
-                )
-                if (uploadError) throw uploadError
+        // Upload with timeout
+        const { error: uploadError } = await withTimeout(
+            supabase.storage.from('library_files').upload(filePath, fileObj),
+            20000,
+            "La subida del archivo tardó demasiado. Revisa tu conexión."
+        )
+        if (uploadError) throw uploadError
 
-                // Insert with timeout
-                const {error: dbError } = await withTimeout(
-                supabase.from('files').insert({
-                    user_id: user.id,
+        // Insert with timeout
+        const { error: dbError } = await withTimeout(
+            supabase.from('files').insert({
+                user_id: user.id,
                 space_id: currentSpace.id,
                 parent_id: folderId,
                 name: finalName,
@@ -201,61 +201,61 @@ export default function TranscriptorPage() {
                 size_bytes: blob.size,
                 storage_path: filePath
             }),
-                10000,
-                "El registro en base de datos tardó demasiado."
-                )
-                if (dbError) throw dbError
+            10000,
+            "El registro en base de datos tardó demasiado."
+        )
+        if (dbError) throw dbError
     }
 
-                const [isSaving, setIsSaving] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
 
     const confirmSave = async () => {
         if (!itemToSave) return
-                try {
-                    setIsSaving(true)
+        try {
+            setIsSaving(true)
             await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
-                alert("Guardado con éxito!")
-                setIsSaveModalOpen(false)
+            alert("Guardado con éxito!")
+            setIsSaveModalOpen(false)
         } catch (error: any) {
-                    console.error("Error guardando:", error)
+            console.error("Error guardando:", error)
             alert(`Error al guardar: ${error.message}`)
         } finally {
-                    setIsSaving(false)
-                }
+            setIsSaving(false)
+        }
     }
 
     const openBatchSave = () => {
         if (!currentSpace) return alert("Selecciona un espacio")
-                fetchFolders()
-                // removed setBatchFolderName
-                setIsBatchSaveModalOpen(true)
+        fetchFolders()
+        // removed setBatchFolderName
+        setIsBatchSaveModalOpen(true)
     }
 
     const confirmBatchSave = async () => {
         const completedItems = queue.filter(i => i.status === 'completed')
-                if (completedItems.length === 0 || !currentSpace) return // Added currentSpace check
+        if (completedItems.length === 0 || !currentSpace) return // Added currentSpace check
 
-                try {
-                    let targetId = selectedFolderId
+        try {
+            let targetId = selectedFolderId
 
-                // If creating a new folder for this batch
-                if (isCreatingFolder && newFolderName) {
-                const {data: {user} } = await supabase.auth.getUser()
+            // If creating a new folder for this batch
+            if (isCreatingFolder && newFolderName) {
+                const { data: { user } } = await supabase.auth.getUser()
                 if (!user) return
-                const {data, error} = await supabase.from('files').insert({
+                const { data, error } = await supabase.from('files').insert({
                     user_id: user.id,
-                space_id: currentSpace.id,
-                parent_id: selectedFolderId, // Can be nested
-                name: newFolderName,
-                type: 'folder'
+                    space_id: currentSpace.id,
+                    parent_id: selectedFolderId, // Can be nested
+                    name: newFolderName,
+                    type: 'folder'
                 }).select().single()
                 if (error) throw error
                 targetId = data.id
             }
 
-                // Loop and Save
-                let successCount = 0
-                for (const item of completedItems) {
+            // Loop and Save
+            let successCount = 0
+            for (const item of completedItems) {
                 try {
                     await saveItemToLibrary(item, targetId)
                     successCount++
@@ -264,304 +264,304 @@ export default function TranscriptorPage() {
                 }
             }
 
-                alert(`Guardado completado: ${successCount}/${completedItems.length} archivos.`)
-                setIsBatchSaveModalOpen(false)
-                setIsCreatingFolder(false)
-                setNewFolderName("")
+            alert(`Guardado completado: ${successCount}/${completedItems.length} archivos.`)
+            setIsBatchSaveModalOpen(false)
+            setIsCreatingFolder(false)
+            setNewFolderName("")
 
         } catch (error: any) {
-                    alert("Error en guardado masivo: " + error.message)
-                }
+            alert("Error en guardado masivo: " + error.message)
+        }
     }
 
 
     // --- Preview Logic ---
     const openPreview = (item: QueueItem) => {
-                    setPreviewItem(item)
+        setPreviewItem(item)
         setPreviewText(item.transcript || "")
-                setIsPreviewModalOpen(true)
+        setIsPreviewModalOpen(true)
     }
 
     const savePreviewEdits = () => {
         if (!previewItem) return
-                // Update the global state with the new transcript
-                updateItemStatus(previewItem.id, 'completed', 100, previewText)
-                setIsPreviewModalOpen(false)
+        // Update the global state with the new transcript
+        updateItemStatus(previewItem.id, 'completed', 100, previewText)
+        setIsPreviewModalOpen(false)
     }
 
 
-                return (
-                <div className="space-y-4 h-full flex flex-col relative">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Transcriptor IA</h2>
-                        {queue.some(i => i.status === 'completed') && (
-                            <Button onClick={openBatchSave} className="bg-primary hover:bg-primary/90">
-                                <Save className="h-4 w-4 mr-2" /> Guardar Todo ({queue.filter(i => i.status === 'completed').length})
-                            </Button>
-                        )}
+    return (
+        <div className="space-y-4 h-full flex flex-col relative">
+            <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Transcriptor IA</h2>
+                {queue.some(i => i.status === 'completed') && (
+                    <Button onClick={openBatchSave} className="bg-primary hover:bg-primary/90">
+                        <Save className="h-4 w-4 mr-2" /> Guardar Todo ({queue.filter(i => i.status === 'completed').length})
+                    </Button>
+                )}
+            </div>
+
+            {/* Main Area: Split into Upload / Queue */}
+            <div className="flex-1 overflow-hidden flex flex-col gap-6">
+
+                {/* Upload Area (Always visible but shrinks if queue exists) */}
+                <div
+                    {...getRootProps()}
+                    className={`w-full ${queue.length > 0 ? 'h-32' : 'flex-1'} min-h-[150px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all cursor-pointer ${isDragActive ? 'border-primary bg-primary/10' : 'border-border bg-card/50 hover:bg-card/80'}`}
+                >
+                    <input {...getInputProps()} />
+                    <div className="p-3 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 mb-2 shadow-inner">
+                        <Upload className={`${queue.length > 0 ? 'h-6 w-6' : 'h-10 w-10'} text-primary`} />
                     </div>
+                    <p className="text-sm font-medium text-center">
+                        {isDragActive ? "Suelta los archivos aquí" : "Arrastra tus archivos de audio/video"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Soporta múltiples archivos</p>
+                </div>
 
-                    {/* Main Area: Split into Upload / Queue */}
-                    <div className="flex-1 overflow-hidden flex flex-col gap-6">
-
-                        {/* Upload Area (Always visible but shrinks if queue exists) */}
-                        <div
-                            {...getRootProps()}
-                            className={`w-full ${queue.length > 0 ? 'h-32' : 'flex-1'} min-h-[150px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all cursor-pointer ${isDragActive ? 'border-primary bg-primary/10' : 'border-border bg-card/50 hover:bg-card/80'}`}
-                        >
-                            <input {...getInputProps()} />
-                            <div className="p-3 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 mb-2 shadow-inner">
-                                <Upload className={`${queue.length > 0 ? 'h-6 w-6' : 'h-10 w-10'} text-primary`} />
-                            </div>
-                            <p className="text-sm font-medium text-center">
-                                {isDragActive ? "Suelta los archivos aquí" : "Arrastra tus archivos de audio/video"}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">Soporta múltiples archivos</p>
+                {/* Queue List */}
+                {queue.length > 0 && (
+                    <div className="flex-1 flex flex-col overflow-hidden bg-card/30 rounded-2xl border border-border/50">
+                        <div className="p-4 border-b border-border/50 flex justify-between items-center bg-card/50">
+                            <h3 className="font-semibold text-sm">Cola de Transcripción ({queue.length})</h3>
+                            {!isProcessing && queue.find(i => i.status === 'pending') && (
+                                <Button size="sm" onClick={() => setIsProcessing(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                                    <Play className="h-3 w-3 mr-2" /> Iniciar Todo
+                                </Button>
+                            )}
+                            {isProcessing && (
+                                <p className="text-xs text-primary animate-pulse font-medium">Procesando cola...</p>
+                            )}
                         </div>
 
-                        {/* Queue List */}
-                        {queue.length > 0 && (
-                            <div className="flex-1 flex flex-col overflow-hidden bg-card/30 rounded-2xl border border-border/50">
-                                <div className="p-4 border-b border-border/50 flex justify-between items-center bg-card/50">
-                                    <h3 className="font-semibold text-sm">Cola de Transcripción ({queue.length})</h3>
-                                    {!isProcessing && queue.find(i => i.status === 'pending') && (
-                                        <Button size="sm" onClick={() => setIsProcessing(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                                            <Play className="h-3 w-3 mr-2" /> Iniciar Todo
-                                        </Button>
-                                    )}
-                                    {isProcessing && (
-                                        <p className="text-xs text-primary animate-pulse font-medium">Procesando cola...</p>
-                                    )}
-                                </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            <AnimatePresence>
+                                {queue.map(item => (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className={`relative flex items-center gap-3 p-3 rounded-xl border ${item.status === 'processing' ? 'border-primary/50 bg-primary/5' : 'border-border/30 bg-card/60'}`}
+                                    >
+                                        {/* Status Icon */}
+                                        <div className="flex-shrink-0">
+                                            {item.status === 'pending' && <Clock className="h-5 w-5 text-muted-foreground" />}
+                                            {item.status === 'processing' && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
+                                            {item.status === 'completed' && <CheckCircle className="h-5 w-5 text-green-500" />}
+                                            {item.status === 'error' && <AlertCircle className="h-5 w-5 text-red-500" />}
+                                        </div>
 
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                    <AnimatePresence>
-                                        {queue.map(item => (
-                                            <motion.div
-                                                key={item.id}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className={`relative flex items-center gap-3 p-3 rounded-xl border ${item.status === 'processing' ? 'border-primary/50 bg-primary/5' : 'border-border/30 bg-card/60'}`}
-                                            >
-                                                {/* Status Icon */}
-                                                <div className="flex-shrink-0">
-                                                    {item.status === 'pending' && <Clock className="h-5 w-5 text-muted-foreground" />}
-                                                    {item.status === 'processing' && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
-                                                    {item.status === 'completed' && <CheckCircle className="h-5 w-5 text-green-500" />}
-                                                    {item.status === 'error' && <AlertCircle className="h-5 w-5 text-red-500" />}
-                                                </div>
-
-                                                {/* File Info */}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-medium text-sm truncate">{item.file.name}</p>
-                                                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                                        <span>{(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
-                                                        {item.status === 'processing' && (
-                                                            <span className="flex items-center gap-2">
-                                                                <span>{Math.round(item.progress)}%</span>
-                                                                {item.statusMessage && (
-                                                                    <span className="hidden sm:inline-block text-primary/80 animate-pulse truncate max-w-[300px] md:max-w-[400px]">
-                                                                        {item.statusMessage}
-                                                                    </span>
-                                                                )}
+                                        {/* File Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm truncate">{item.file.name}</p>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                                <span>{(item.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                {item.status === 'processing' && (
+                                                    <span className="flex items-center gap-2">
+                                                        <span>{Math.round(item.progress)}%</span>
+                                                        {item.statusMessage && (
+                                                            <span className="hidden sm:inline-block text-primary/80 animate-pulse truncate max-w-[300px] md:max-w-[400px]">
+                                                                {item.statusMessage}
                                                             </span>
                                                         )}
-                                                        {item.status === 'error' && <span className="text-red-400 truncate max-w-[150px]">{item.error}</span>}
-                                                    </div>
-                                                    {/* Progress Bar */}
-                                                    {item.status === 'processing' && (
-                                                        <div className="h-1 w-full bg-accent rounded-full mt-2 overflow-hidden">
-                                                            <motion.div
-                                                                className="h-full bg-primary"
-                                                                initial={{ width: 0 }}
-                                                                animate={{ width: `${item.progress}%` }}
-                                                            />
-                                                        </div>
-                                                    )}
+                                                    </span>
+                                                )}
+                                                {item.status === 'error' && <span className="text-red-400 truncate max-w-[150px]">{item.error}</span>}
+                                            </div>
+                                            {/* Progress Bar */}
+                                            {item.status === 'processing' && (
+                                                <div className="h-1 w-full bg-accent rounded-full mt-2 overflow-hidden">
+                                                    <motion.div
+                                                        className="h-full bg-primary"
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${item.progress}%` }}
+                                                    />
                                                 </div>
+                                            )}
+                                        </div>
 
-                                                {/* Actions */}
-                                                <div className="flex gap-2">
-                                                    {item.status === 'completed' && (
-                                                        <>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => openPreview(item)} title="Ver/Editar">
-                                                                <Eye className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => openSaveModal(item)} title="Guardar">
-                                                                <Save className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(item.transcript || ""); alert("Copiado!") }}>
-                                                                <Copy className="h-4 w-4" />
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeItem(item.id)}>
-                                                        <X className="h-4 w-4" />
+                                        {/* Actions */}
+                                        <div className="flex gap-2">
+                                            {item.status === 'completed' && (
+                                                <>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:bg-blue-50" onClick={() => openPreview(item)} title="Ver/Editar">
+                                                        <Eye className="h-4 w-4" />
                                                     </Button>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-                                    </AnimatePresence>
-                                    {queue.length === 0 && (
-                                        <p className="text-center text-muted-foreground text-sm py-8">La cola está vacía</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => openSaveModal(item)} title="Guardar">
+                                                        <Save className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(item.transcript || ""); alert("Copiado!") }}>
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
+                                                </>
+                                            )}
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => removeItem(item.id)}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                            {queue.length === 0 && (
+                                <p className="text-center text-muted-foreground text-sm py-8">La cola está vacía</p>
+                            )}
+                        </div>
                     </div>
+                )}
+            </div>
 
-                    {/* Save Modal */}
-                    {isSaveModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                            <Card className="w-full max-w-md p-6 space-y-4 bg-background border-border shadow-2xl relative">
-                                <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setIsSaveModalOpen(false)}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                                <h3 className="text-lg font-semibold">Guardar Transcripción</h3>
+            {/* Save Modal */}
+            {isSaveModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <Card className="w-full max-w-md p-6 space-y-4 bg-background border-border shadow-2xl relative">
+                        <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setIsSaveModalOpen(false)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                        <h3 className="text-lg font-semibold">Guardar Transcripción</h3>
 
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-medium">Nombre del archivo</label>
-                                        <Input value={saveFileName} onChange={(e) => setSaveFileName(e.target.value)} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between items-center">
-                                            <label className="text-xs font-medium">Carpeta</label>
-                                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
-                                                <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
-                                            </Button>
-                                        </div>
-                                        <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
-                                            {loadingFolders && folders.length === 0 && (
-                                                <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
-                                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                                                </div>
-                                            )}
-                                            <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
-                                                <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
-                                            </button>
-                                            {folders.map(f => (
-                                                <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
-                                                    <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {!isCreatingFolder ? (
-                                            <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
-                                                <FolderPlus className="h-4 w-4 mr-2" /> Nueva Carpeta
-                                            </Button>
-                                        ) : (
-                                            <div className="flex gap-2 mt-2">
-                                                <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nombre carpeta" className="h-8" />
-                                                <Button size="sm" onClick={handleCreateFolder} disabled={loadingFolders}>
-                                                    {loadingFolders ? <Loader2 className="h-3 w-3 animate-spin" /> : "Crear"}
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <Button variant="outline" onClick={() => setIsSaveModalOpen(false)}>Cancelar</Button>
-                                    <Button onClick={confirmSave} disabled={isSaving}>
-                                        {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                                        Guardar
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium">Nombre del archivo</label>
+                                <Input value={saveFileName} onChange={(e) => setSaveFileName(e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-medium">Carpeta</label>
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
+                                        <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
                                     </Button>
                                 </div>
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* Batch Save Modal */}
-                    {isBatchSaveModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                            <Card className="w-full max-w-md p-6 space-y-4 bg-background border-border shadow-2xl relative">
-                                <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setIsBatchSaveModalOpen(false)}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                                <h3 className="text-lg font-semibold">Guardar Todo ({queue.filter(i => i.status === 'completed').length})</h3>
-                                <p className="text-sm text-muted-foreground">Elige dónde guardar los archivos resultantes.</p>
-
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between items-center">
-                                            <label className="text-xs font-medium">Carpeta de Destino</label>
-                                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
-                                                <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
-                                            </Button>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
+                                    {loadingFolders && folders.length === 0 && (
+                                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
                                         </div>
-                                        <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
-                                            {loadingFolders && folders.length === 0 && (
-                                                <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
-                                                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                                                </div>
-                                            )}
-                                            <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
-                                                <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
-                                            </button>
-                                            {folders.map(f => (
-                                                <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
-                                                    <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {!isCreatingFolder ? (
-                                            <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
-                                                <FolderPlus className="h-4 w-4 mr-2" /> Crear Carpeta para este lote
-                                            </Button>
-                                        ) : (
-                                            <div className="flex gap-2 mt-2">
-                                                <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Ej: Transcripciones Reunión X" className="h-8" />
-                                                <Button size="sm" onClick={() => { /* Logic to create wrapper folder in memory? No just create immediately */ }} disabled>
-                                                    Use 'Crear' inside logic
-                                                </Button>
-                                                <span className="text-xs text-muted-foreground self-center">Se creará al guardar</span>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    )}
+                                    <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
+                                        <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
+                                    </button>
+                                    {folders.map(f => (
+                                        <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
+                                            <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="flex justify-end gap-2 pt-2">
-                                    <Button variant="outline" onClick={() => setIsBatchSaveModalOpen(false)}>Cancelar</Button>
-                                    <Button onClick={confirmBatchSave}>Guardar Todo</Button>
-                                </div>
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* Preview/Edit Modal */}
-                    {isPreviewModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-300">
-                            <Card className="w-full max-w-3xl h-[80vh] flex flex-col bg-background border-border shadow-2xl relative animate-in slide-in-from-bottom-10 duration-500">
-                                <div className="flex items-center justify-between p-4 border-b">
-                                    <div className="flex items-center gap-2">
-                                        <Pencil className="h-4 w-4 text-primary" />
-                                        <h3 className="text-lg font-semibold">Revisar Transcripción</h3>
-                                    </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setIsPreviewModalOpen(false)}>
-                                        <X className="h-4 w-4" />
+                                {!isCreatingFolder ? (
+                                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
+                                        <FolderPlus className="h-4 w-4 mr-2" /> Nueva Carpeta
                                     </Button>
-                                </div>
-
-                                <div className="flex-1 p-0 overflow-hidden relative">
-                                    <textarea
-                                        className="w-full h-full p-6 resize-none focus:outline-none bg-transparent font-mono text-sm leading-relaxed"
-                                        value={previewText}
-                                        onChange={(e) => setPreviewText(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="p-4 border-t flex justify-between items-center bg-muted/20">
-                                    <span className="text-xs text-muted-foreground">{previewText.length} caracteres</span>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" onClick={() => setIsPreviewModalOpen(false)}>Cancelar</Button>
-                                        <Button onClick={savePreviewEdits}>Confirmar Cambios</Button>
+                                ) : (
+                                    <div className="flex gap-2 mt-2">
+                                        <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Nombre carpeta" className="h-8" />
+                                        <Button size="sm" onClick={handleCreateFolder} disabled={loadingFolders}>
+                                            {loadingFolders ? <Loader2 className="h-3 w-3 animate-spin" /> : "Crear"}
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
                                     </div>
-                                </div>
-                            </Card>
+                                )}
+                            </div>
                         </div>
-                    )}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setIsSaveModalOpen(false)}>Cancelar</Button>
+                            <Button onClick={confirmSave} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Guardar
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
-                )
+            )}
+
+            {/* Batch Save Modal */}
+            {isBatchSaveModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <Card className="w-full max-w-md p-6 space-y-4 bg-background border-border shadow-2xl relative">
+                        <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setIsBatchSaveModalOpen(false)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                        <h3 className="text-lg font-semibold">Guardar Todo ({queue.filter(i => i.status === 'completed').length})</h3>
+                        <p className="text-sm text-muted-foreground">Elige dónde guardar los archivos resultantes.</p>
+
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-medium">Carpeta de Destino</label>
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
+                                        <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
+                                    {loadingFolders && folders.length === 0 && (
+                                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                        </div>
+                                    )}
+                                    <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
+                                        <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
+                                    </button>
+                                    {folders.map(f => (
+                                        <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
+                                            <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                {!isCreatingFolder ? (
+                                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
+                                        <FolderPlus className="h-4 w-4 mr-2" /> Crear Carpeta para este lote
+                                    </Button>
+                                ) : (
+                                    <div className="flex gap-2 mt-2">
+                                        <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Ej: Transcripciones Reunión X" className="h-8" />
+                                        <Button size="sm" onClick={() => { /* Logic to create wrapper folder in memory? No just create immediately */ }} disabled>
+                                            Use 'Crear' inside logic
+                                        </Button>
+                                        <span className="text-xs text-muted-foreground self-center">Se creará al guardar</span>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setIsCreatingFolder(false)}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setIsBatchSaveModalOpen(false)}>Cancelar</Button>
+                            <Button onClick={confirmBatchSave}>Guardar Todo</Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Preview/Edit Modal */}
+            {isPreviewModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-300">
+                    <Card className="w-full max-w-3xl h-[80vh] flex flex-col bg-background border-border shadow-2xl relative animate-in slide-in-from-bottom-10 duration-500">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <div className="flex items-center gap-2">
+                                <Pencil className="h-4 w-4 text-primary" />
+                                <h3 className="text-lg font-semibold">Revisar Transcripción</h3>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setIsPreviewModalOpen(false)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="flex-1 p-0 overflow-hidden relative">
+                            <textarea
+                                className="w-full h-full p-6 resize-none focus:outline-none bg-transparent font-mono text-sm leading-relaxed"
+                                value={previewText}
+                                onChange={(e) => setPreviewText(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="p-4 border-t flex justify-between items-center bg-muted/20">
+                            <span className="text-xs text-muted-foreground">{previewText.length} caracteres</span>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => setIsPreviewModalOpen(false)}>Cancelar</Button>
+                                <Button onClick={savePreviewEdits}>Confirmar Cambios</Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
+        </div>
+    )
 }
