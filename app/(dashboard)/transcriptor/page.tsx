@@ -157,7 +157,8 @@ export default function TranscriptorPage() {
 
     // --- Helper: Save Single Item (Refactored) ---
     const saveItemToLibrary = async (item: QueueItem, folderId: string | null, customName?: string) => {
-        if (!item.transcript || !currentSpace) return
+        if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
+        if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("No usuario autenticado")
@@ -188,15 +189,20 @@ export default function TranscriptorPage() {
         if (dbError) throw dbError
     }
 
+    const [isSaving, setIsSaving] = useState(false)
+
     const confirmSave = async () => {
         if (!itemToSave) return
         try {
+            setIsSaving(true)
             await saveItemToLibrary(itemToSave, selectedFolderId, saveFileName)
             alert("Guardado con éxito!")
             setIsSaveModalOpen(false)
         } catch (error: any) {
             console.error("Error guardando:", error)
             alert(`Error al guardar: ${error.message}`)
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -440,7 +446,10 @@ export default function TranscriptorPage() {
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
                             <Button variant="outline" onClick={() => setIsSaveModalOpen(false)}>Cancelar</Button>
-                            <Button onClick={confirmSave}>Guardar</Button>
+                            <Button onClick={confirmSave} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                                Guardar
+                            </Button>
                         </div>
                     </Card>
                 </div>
