@@ -82,10 +82,12 @@ export default function TranscriptorPage() {
     const fetchFolders = async (silent = false) => {
         if (!currentSpace) return
         if (!silent) setLoadingFolders(true)
+        if (silent) setConnectionStatus('reconnecting')
 
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             if (!silent) setLoadingFolders(false)
+            setConnectionStatus('disconnected')
             return
         }
 
@@ -109,10 +111,15 @@ export default function TranscriptorPage() {
             const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
 
             if (error) throw error
-            if (data) setFolders(data)
+            if (data) {
+                setFolders(data)
+                setConnectionStatus('connected')
+                setLastRefreshed(new Date())
+            }
 
         } catch (error: any) {
             console.error(error)
+            setConnectionStatus('disconnected')
             if (!silent) {
                 alert(error.message === "Tiempo de espera agotado"
                     ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
