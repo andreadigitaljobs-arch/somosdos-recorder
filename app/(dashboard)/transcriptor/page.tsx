@@ -201,7 +201,15 @@ export default function TranscriptorPage() {
         }).select().single()
 
         try {
-            const [uploadResult, insertResult] = await Promise.all([uploadPromise, insertPromise])
+            // SAFETY TIMEOUT: 15 seconds max
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Tiempo de espera agotado (15s). Verifica tu conexión.")), 15000)
+            )
+
+            const [uploadResult, insertResult] = await Promise.race([
+                Promise.all([uploadPromise, insertPromise]),
+                timeoutPromise
+            ]) as [any, any] // Type assertion for race result
 
             // Check for errors in results
             if (uploadResult.error) throw uploadResult.error
