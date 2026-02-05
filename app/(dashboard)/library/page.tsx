@@ -61,6 +61,25 @@ export default function LibraryPage() {
     const [itemToMove, setItemToMove] = useState<FileSystemItem | null>(null)
     const [targetFolderId, setTargetFolderId] = useState<string | null>(null)
 
+    // --- Bulk Selection State ---
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const isSelectionMode = selectedIds.size > 0
+
+    const toggleSelection = (id: string, event?: React.MouseEvent) => {
+        event?.stopPropagation()
+        const newSet = new Set(selectedIds)
+        if (newSet.has(id)) newSet.delete(id)
+        else newSet.add(id)
+        setSelectedIds(newSet)
+    }
+
+    const clearSelection = () => setSelectedIds(new Set())
+
+    const handleSelectAll = () => {
+        if (selectedIds.size === filteredItems.length) clearSelection()
+        else setSelectedIds(new Set(filteredItems.map(i => i.id)))
+    }
+
 
 
     // Helper: Format Bytes
