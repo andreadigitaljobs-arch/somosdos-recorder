@@ -130,10 +130,10 @@ export default function TranscriptorPage() {
         if (currentSpace) {
             fetchFolders(true)
 
-            // 1. Interval
+            // 1. Interval (5s Aggressive Heartbeat)
             const interval = setInterval(() => {
                 fetchFolders(true)
-            }, 30000)
+            }, 5000)
 
             // 2. Focus Handler
             const handleFocus = () => {
@@ -186,9 +186,19 @@ export default function TranscriptorPage() {
         if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
         // Use getSession for faster, local validation to avoid timeouts
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user) throw new Error("No usuario autenticado")
-        const user = session.user
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+        // Explicitly check and try to refresh if needed
+        if (sessionError || !session?.user) {
+            console.warn("Session may be expired, attempting refresh...")
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+            if (refreshError || !refreshData.session) {
+                throw new Error("Tu sesión ha expirado. Por favor recarga la página.")
+            }
+        }
+
+        const user = session?.user || (await supabase.auth.getUser()).data.user
+        if (!user) throw new Error("No usuario autenticado")
 
         // Ensure .txt extension
         const fullFileName = customName ? customName.trim() : item.file.name
