@@ -188,76 +188,7 @@ export default function TranscriptorPage() {
     const [isBatchSaveModalOpen, setIsBatchSaveModalOpen] = useState(false)
     // removed unused batchFolderName
 
-    // --- Helper: Save Single Item (Refactored) ---
-    const saveItemToLibrary = async (item: QueueItem, folderId: string | null, customName?: string) => {
-        if (!item.transcript) throw new Error("No hay transcripción disponible para guardar")
-        if (!currentSpace) throw new Error("No hay un espacio seleccionado")
 
-        // Use getSession for faster, local validation to avoid timeouts
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-        // Explicitly check and try to refresh if needed
-        if (sessionError || !session?.user) {
-            console.warn("Session may be expired, attempting refresh...")
-            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-            if (refreshError || !refreshData.session) {
-                throw new Error("Tu sesión ha expirado. Por favor recarga la página.")
-            }
-        }
-
-        const user = session?.user || (await supabase.auth.getUser()).data.user
-        if (!user) throw new Error("No usuario autenticado")
-
-        // Ensure .txt extension
-        const fullFileName = customName ? customName.trim() : item.file.name
-        const finalName = fullFileName.endsWith('.txt') ? fullFileName : `${fullFileName}.txt`
-
-        // SANITIZATION
-        const sanitizedName = finalName.replace(/[^a-zA-Z0-9.-]/g, '_')
-        const filePath = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${sanitizedName}`
-
-        const blob = new Blob([item.transcript], { type: 'text/plain' })
-        const fileObj = new File([blob], finalName, { type: 'text/plain' })
-
-        // PARALLEL EXECUTION: Upload and Insert simultaneously to reduce latency
-        const uploadPromise = supabase.storage.from('library_files').upload(filePath, fileObj)
-
-        const insertPromise = supabase.from('files').insert({
-            user_id: user.id,
-            space_id: currentSpace.id,
-            parent_id: folderId,
-            name: finalName,
-            type: 'file',
-            size_bytes: blob.size,
-            storage_path: filePath
-        }).select().single()
-
-        try {
-            // SAFETY TIMEOUT: 15 seconds max
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Tiempo de espera agotado (15s). Verifica tu conexión.")), 15000)
-            )
-
-            const [uploadResult, insertResult] = await Promise.race([
-                Promise.all([uploadPromise, insertPromise]),
-                timeoutPromise
-            ]) as [any, any] // Type assertion for race result
-
-            // Check for errors in results
-            if (uploadResult.error) throw uploadResult.error
-            if (insertResult.error) throw insertResult.error
-
-        } catch (error) {
-            // ROLLBACK: If something failed, try to clean up to avoid orphans/broken links
-            console.error("Error in parallel save, rolling back:", error)
-            // Attempt to delete file (silent fail ok)
-            await supabase.storage.from('library_files').remove([filePath])
-            // Attempt to delete DB row (difficult without ID, but if insert failed we are good. 
-            // If insert succeeded but upload failed, we ideally delete the row. 
-            // Since we can't easily get the ID if upload threw first, we rely on user retrying.)
-            throw error
-        }
-    }
 
     // --- Optimistic Save Logic ---
     const [isSaving, setIsSaving] = useState(false) // Restore state for batch/compatibility
