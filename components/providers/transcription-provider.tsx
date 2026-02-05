@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { useSpace } from "@/components/providers/space-provider"
 import { createClient } from "@/lib/supabase/client"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export type QueueItem = {
     id: string
@@ -80,21 +79,11 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
             updateItemStatus(pendingItem.id, 'processing', 5)
             playNotificationSound('start')
 
-            // Mock progress
-            const progressInterval = setInterval(() => {
-                setQueue(prev => prev.map(i =>
-                    i.id === pendingItem.id && i.status === 'processing' && i.progress < 90
-                        ? { ...i, progress: i.progress + 5 }
-                        : i
-                ))
-            }, 800)
-
-
             // Fun loading messages to keep user entertained
             const getRandomMessage = (stage: 'upload' | 'extract' | 'split' | 'transcribe' | 'combine') => {
                 const messages = {
                     upload: [
-                        "Subiendo... ☁️",
+                        "Subiendo al servidor... ☁️",
                         "Enviando datos... 📡",
                         "Cargando... ⏳",
                     ],
@@ -102,25 +91,21 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                         "Desempolvando IA... 🧠",
                         "Extrayendo audio... 🎧",
                         "Escuchando... 👂",
-                        "Separando ruido... 🎼"
                     ],
                     split: [
                         "Rebanando audio... 🔪",
                         "Preparando datos... 🍱",
-                        "Organizando... 🗂️"
                     ],
                     transcribe: [
-                        "Tomando notas... 📝",
-                        "Descifrando... 🕵️",
-                        "Escribiendo... ✍️",
-                        "Convirtiendo... 🔄",
-                        "Tecleando... ⌨️"
+                        "La IA está pensando... 🤖",
+                        "Descifrando audio... 🕵️",
+                        "Escribiendo transcripción... ✍️",
+                        "Procesando en Railway... 🚄",
                     ],
                     combine: [
                         "Uniendo todo... 🧩",
                         "Pulitura final... ✨",
-                        "Formateando... 📄",
-                        "Casi listo... 🚀"
+                        "Guardando... 💾"
                     ]
                 }
                 const stageMessages = messages[stage]
@@ -128,21 +113,21 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
             }
 
             try {
-                const apiKey = localStorage.getItem("gemini_api_key")
-                if (!apiKey) throw new Error("No API Key configurada")
+                // Determine API Key (Local or let Server use fallback)
+                const localKey = localStorage.getItem("gemini_api_key") || "";
                 if (!currentSpace) throw new Error("No hay espacio seleccionado")
 
                 // Sanitize filename
                 const safeName = pendingItem.file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
 
-                // Check if file needs chunking (> 20MB)
+                // Check if file needs chunking
+                // RAISED LIMIT TO 95MB because Next.js Server Actions allow 200MB (configured in next.config.ts)
+                // We leave some margin. 25MB file will now be SINGLE UPLOAD (Faster & Safer)
                 const { shouldUseChunking } = await import('@/lib/audio-chunker')
-                const useChunking = shouldUseChunking(pendingItem.file, 20)
+                const useChunking = shouldUseChunking(pendingItem.file, 95)
 
                 if (useChunking) {
-                    // === CHUNKED PROCESSING FOR LARGE FILES ===
-                    clearInterval(progressInterval) // STOP FAKE PROGRESS! We calculate real progress here.
-
+                    // === CHUNKED PROCESSING (For files > 95MB) ===
                     let currentExtractMsg = getRandomMessage('extract')
                     updateItemStatus(pendingItem.id, 'processing', 5, undefined, undefined, currentExtractMsg)
 
@@ -153,181 +138,105 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     try {
                         chunks = await processFileIntoChunks(
                             pendingItem.file,
-                            1, // 1-minute chunks (Bulletproof for Vercel 10s limit)
+                            2, // 2-minute chunks (Safe for File API)
                             (stage, progress, details) => {
                                 if (stage === 'extract') {
-                                    // Update progress but KEEP the same message to avoid flickering
                                     updateItemStatus(pendingItem.id, 'processing', Math.round(5 + (progress * 0.15)), undefined, undefined, currentExtractMsg)
                                 } else if (stage === 'split') {
-                                    if (progress === 0) currentExtractMsg = getRandomMessage('split') // Reuse variable for split msg
+                                    if (progress === 0) currentExtractMsg = getRandomMessage('split')
                                     updateItemStatus(pendingItem.id, 'processing', Math.round(20 + (progress * 0.1)), undefined, undefined, currentExtractMsg)
                                 }
                             }
                         )
                     } catch (error) {
-                        // Short error for UI
                         throw new Error(`Error procesando: ${error instanceof Error ? error.message.substring(0, 20) : '...'}`)
                     }
 
                     updateItemStatus(pendingItem.id, 'processing', 30, undefined, undefined, `Procesando ${chunks.length} segmentos...`)
 
-                    // Step 2: Process each chunk
+                    // Step 2: Process each chunk via Server Action
                     const transcriptions: string[] = []
-                    const { transcribeAudio } = await import("@/app/actions/transcribe")
 
                     for (let i = 0; i < chunks.length; i++) {
                         const chunk = chunks[i]
-                        // VALIDATION: Check for empty chunks from ffmpeg
-                        if (chunk.size === 0) {
-                            console.warn(`Chunk ${i + 1} is 0 bytes. Skipping.`);
-                            continue;
-                        }
+                        const chunkProgress = 30 + ((i / chunks.length) * 65)
 
-                        const chunkProgress = 30 + ((i / chunks.length) * 65) // Map to 30-95%
+                        updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Analizando bloque ${i + 1}/${chunks.length}...`)
 
-                        // 1. DIRECT UPLOAD TO SERVER ACTION (Bypassing Supabase for Speed)
-                        updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Analizando IA (${i + 1}/${chunks.length})...`)
-
-                        // Convert Blob to Base64
+                        // Convert Chunk to Base64
                         const base64Promise = new Promise<string>((resolve, reject) => {
                             const reader = new FileReader();
                             reader.onloadend = () => {
                                 const result = reader.result as string;
-                                const base64 = result.split(',')[1];
+                                // Handle both data: URLs and raw
+                                const base64 = result.includes(',') ? result.split(',')[1] : result;
                                 resolve(base64);
                             }
                             reader.onerror = reject;
                             reader.readAsDataURL(chunk);
                         });
-
                         const base64Data = await base64Promise;
 
-                        const prompt = "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
+                        // Call SERVER ACTION
+                        const { transcribeAudio } = await import("@/app/actions/transcribe")
+                        const result = await transcribeAudio({
+                            fileBase64: base64Data,
+                            apiKey: localKey, // Pass local key if exists, or Server will use ENV
+                            mimeType: 'audio/mp3',
+                            originalName: `part_${i}_${safeName}`
+                        })
 
-                        // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
-                        // CLIENT-SIDE GEMINI CALL (Bypassing Vercel Server)
-                        const genAI = new GoogleGenerativeAI(apiKey);
-
-                        // Fallback strategy: Try multiple models if one is not found (404)
-                        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-001", "gemini-1.5-pro", "gemini-1.5-flash-8b"];
-                        let text = "";
-                        let success = false;
-                        let lastError;
-
-                        for (const modelName of modelsToTry) {
-                            try {
-                                console.log(`Attempting transcription with model: ${modelName}`);
-                                const model = genAI.getGenerativeModel({ model: modelName });
-
-                                const result = await model.generateContent([
-                                    prompt,
-                                    {
-                                        inlineData: {
-                                            mimeType: "audio/mp3",
-                                            data: base64Data
-                                        }
-                                    }
-                                ]);
-
-                                text = result.response.text();
-                                if (text) {
-                                    success = true;
-                                    break; // Exit loop on success
-                                }
-                            } catch (error: any) {
-                                console.warn(`Failed with model ${modelName}:`, error.message);
-                                lastError = error;
-                                // If 404, continue. If 401 (Auth), probably all will fail, but worth trying.
-                            }
+                        if (result.error) {
+                            throw new Error(`Error en bloque ${i + 1}: ${result.error}`)
                         }
 
-                        if (!success || !text) throw lastError || new Error("No compatible Gemini model found for your key/region.");
-
-                        transcriptions.push(text)
+                        transcriptions.push(result.transcription || "")
                     }
 
-                    // Step 3: Combine transcriptions
-                    updateItemStatus(pendingItem.id, 'processing', 95, undefined, undefined, getRandomMessage('combine'))
+                    // Step 3: Combine
                     const finalTranscription = transcriptions.join('\n\n')
-
-                    clearInterval(progressInterval)
                     updateItemStatus(pendingItem.id, 'completed', 100, finalTranscription)
                     playNotificationSound('success')
-
-                    // Log to database
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user) {
-                        await supabase.from('transcriptions').insert({
-                            user_id: user.id,
-                            content: finalTranscription,
-                            metadata: {
-                                space_id: currentSpace?.id,
-                                filename: pendingItem.file.name,
-                                file_size: pendingItem.file.size,
-                                chunks_processed: chunks.length
-                            }
-                        })
-                    }
+                    await saveToDb(finalTranscription, pendingItem, currentSpace, chunks.length)
 
                 } else {
-                    // === STANDARD PROCESSING FOR SMALL FILES ===
-                    const filePath = `temp_transcriptions/${Date.now()}_${safeName}`
-
+                    // === SINGLE FILE PROCESSING (< 95MB) ===
+                    // This is the optimized path on Railway
                     updateItemStatus(pendingItem.id, 'processing', 10, undefined, undefined, getRandomMessage('upload'))
 
-                    const { error: uploadError } = await supabase.storage
-                        .from('library_files')
-                        .upload(filePath, pendingItem.file, {
-                            cacheControl: '3600',
-                            upsert: false
-                        })
+                    const base64Promise = new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const result = reader.result as string;
+                            const base64 = result.includes(',') ? result.split(',')[1] : result;
+                            resolve(base64);
+                        }
+                        reader.onerror = reject;
+                        reader.readAsDataURL(pendingItem.file);
+                    });
+                    const base64Data = await base64Promise;
 
-                    if (uploadError) throw new Error("Error subiendo archivo: " + uploadError.message)
+                    updateItemStatus(pendingItem.id, 'processing', 40, undefined, undefined, getRandomMessage('transcribe'))
 
-                    updateItemStatus(pendingItem.id, 'processing', 30, undefined, undefined, getRandomMessage('transcribe'))
-
-                    // Get Signed URL
-                    const { data, error: urlError } = await supabase.storage
-                        .from('library_files')
-                        .createSignedUrl(filePath, 3600)
-
-                    if (urlError || !data?.signedUrl) throw new Error("Error generando URL temporal")
-
-                    // Transcribe
                     const { transcribeAudio } = await import("@/app/actions/transcribe")
                     const result = await transcribeAudio({
-                        fileUrl: data.signedUrl,
-                        apiKey,
-                        mimeType: pendingItem.file.type,
-                        originalName: pendingItem.file.name
+                        fileBase64: base64Data, // Send Full File
+                        apiKey: localKey,
+                        mimeType: pendingItem.file.type || 'audio/mp3',
+                        originalName: safeName
                     })
 
-                    if (result.error) throw new Error(result.error)
+                    if (result.error) {
+                        throw new Error(`Error Servidor: ${result.error}`)
+                    }
 
-                    // Cleanup
-                    await supabase.storage.from('library_files').remove([filePath])
-
-                    clearInterval(progressInterval)
                     updateItemStatus(pendingItem.id, 'completed', 100, result.transcription)
                     playNotificationSound('success')
-
-                    // Log to database
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user) {
-                        await supabase.from('transcriptions').insert({
-                            user_id: user.id,
-                            content: result.transcription,
-                            metadata: {
-                                space_id: currentSpace?.id,
-                                filename: pendingItem.file.name,
-                                file_size: pendingItem.file.size
-                            }
-                        })
-                    }
+                    await saveToDb(result.transcription || "", pendingItem, currentSpace)
                 }
 
             } catch (error: any) {
-                clearInterval(progressInterval)
+                console.error(error)
                 updateItemStatus(pendingItem.id, 'error', 0, undefined, error.message)
                 playNotificationSound('error')
             } finally {
@@ -340,38 +249,49 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
         }
     }, [queue, isProcessing, currentItemId, currentSpace, supabase])
 
+    // Helper for DB Save
+    const saveToDb = async (content: string, item: QueueItem, space: any, chunksCount = 1) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            await supabase.from('transcriptions').insert({
+                user_id: user.id,
+                content: content,
+                metadata: {
+                    space_id: space?.id,
+                    filename: item.file.name,
+                    file_size: item.file.size,
+                    chunks_processed: chunksCount
+                }
+            })
+        }
+    }
+
     // --- Audio Feedback ---
     const playNotificationSound = (type: 'success' | 'error' | 'start') => {
         try {
             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
             if (!AudioContext) return;
-
             const ctx = new AudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-
             osc.connect(gain);
             gain.connect(ctx.destination);
 
             if (type === 'success') {
-                // Happy major third beep (Ding!)
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
-                osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1); // C#6
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1);
                 gain.gain.setValueAtTime(0.1, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.6);
             } else if (type === 'start') {
-                // Soft start blip
-                osc.type = 'sine';
                 osc.frequency.setValueAtTime(440, ctx.currentTime);
                 gain.gain.setValueAtTime(0.05, ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
                 osc.start(ctx.currentTime);
                 osc.stop(ctx.currentTime + 0.2);
             } else {
-                // Error buzz
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(110, ctx.currentTime);
                 osc.frequency.linearRampToValueAtTime(55, ctx.currentTime + 0.3);
@@ -381,10 +301,9 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                 osc.stop(ctx.currentTime + 0.3);
             }
         } catch (e) {
-            console.error("Audio playback error:", e);
+            console.error(e);
         }
     }
-
 
     return (
         <TranscriptionContext.Provider value={{ queue, setQueue, isProcessing, setIsProcessing, addToQueue, updateItemStatus, removeItem }}>

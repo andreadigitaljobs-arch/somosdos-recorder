@@ -23,12 +23,14 @@ export async function transcribeAudio(params: TranscribeParams) {
     let tempFilePath = "";
 
     // Validate Input
-    if (!params.apiKey) {
+    const finalApiKey = params.apiKey || process.env.GEMINI_API_KEY;
+    if (!finalApiKey) {
         return { error: "API Key is required." };
     }
 
     try {
-        const { fileBase64, fileUrl, apiKey, mimeType, originalName } = params;
+        const { fileBase64, fileUrl, mimeType, originalName } = params;
+        const apiKey = finalApiKey;
         const prompt = params.prompt || "Generate a clean, well-formatted transcription of this audio/video in SPANISH. If the audio is in English or another language, TRANSLATE it to Spanish. Use clear paragraph breaks. Do NOT use markdown. Output plain text only.";
 
         // Initialize Gemini Clients
