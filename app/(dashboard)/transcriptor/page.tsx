@@ -32,8 +32,6 @@ export default function TranscriptorPage() {
     const [toastStatus, setToastStatus] = useState<'loading' | 'success' | 'error'>('loading')
     const [toastMessage, setToastMessage] = useState("")
 
-    // Connection Status State
-    const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected')
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
 
@@ -93,7 +91,6 @@ export default function TranscriptorPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             if (!silent) setLoadingFolders(false)
-            setConnectionStatus('disconnected')
             return
         }
 
@@ -119,13 +116,11 @@ export default function TranscriptorPage() {
             if (error) throw error
             if (data) {
                 setFolders(data)
-                setConnectionStatus('connected')
                 setLastRefreshed(new Date())
             }
 
         } catch (error: any) {
             console.error(error)
-            setConnectionStatus('disconnected')
             if (!silent) {
                 alert(error.message === "Tiempo de espera agotado"
                     ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
