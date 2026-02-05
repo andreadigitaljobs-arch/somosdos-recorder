@@ -67,12 +67,13 @@ export default function TranscriptorPage() {
         fetchFolders()
     }
 
-    const fetchFolders = async () => {
+    const fetchFolders = async (silent = false) => {
         if (!currentSpace) return
-        setLoadingFolders(true)
+        if (!silent) setLoadingFolders(true)
+
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
-            setLoadingFolders(false)
+            if (!silent) setLoadingFolders(false)
             return
         }
 
@@ -100,14 +101,27 @@ export default function TranscriptorPage() {
 
         } catch (error: any) {
             console.error(error)
-            alert(error.message === "Tiempo de espera agotado"
-                ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
-                : "Error cargando carpetas. Verifica tu conexión."
-            )
+            if (!silent) {
+                alert(error.message === "Tiempo de espera agotado"
+                    ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
+                    : "Error cargando carpetas. Verifica tu conexión."
+                )
+            }
         } finally {
-            setLoadingFolders(false)
+            if (!silent) setLoadingFolders(false)
         }
     }
+
+    // Auto-refresh folders every 30s to keep connection alive
+    useEffect(() => {
+        if (currentSpace) {
+            fetchFolders(true) // Initial fetch (silent or not? Maybe silent if first load implies hydration)
+            const interval = setInterval(() => {
+                fetchFolders(true)
+            }, 30000)
+            return () => clearInterval(interval)
+        }
+    }, [currentSpace]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleCreateFolder = async () => {
         if (!newFolderName || !currentSpace) return
@@ -389,7 +403,7 @@ export default function TranscriptorPage() {
                             <div className="space-y-1">
                                 <div className="flex justify-between items-center">
                                     <label className="text-xs font-medium">Carpeta</label>
-                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={fetchFolders} title="Recargar carpetas">
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
                                         <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
                                     </Button>
                                 </div>
@@ -445,7 +459,7 @@ export default function TranscriptorPage() {
                             <div className="space-y-1">
                                 <div className="flex justify-between items-center">
                                     <label className="text-xs font-medium">Carpeta de Destino</label>
-                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={fetchFolders} title="Recargar carpetas">
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => fetchFolders(false)} title="Recargar carpetas">
                                         <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
                                     </Button>
                                 </div>
