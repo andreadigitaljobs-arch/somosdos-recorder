@@ -34,7 +34,6 @@ export default function QuizPage() {
     const [currentQuizId, setCurrentQuizId] = useState<string | null>(null)
     const [editingIndex, setEditingIndex] = useState<number | null>(null)
     const [editValue, setEditValue] = useState("")
-    const [editValue, setEditValue] = useState("")
     const { currentSpace } = useSpace()
     const { playSound } = useAudioFeedback()
 
