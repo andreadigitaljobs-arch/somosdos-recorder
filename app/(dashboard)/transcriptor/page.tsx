@@ -123,12 +123,7 @@ export default function TranscriptorPage() {
 
         } catch (error: any) {
             console.error(error)
-            if (!silent) {
-                alert(error.message === "Tiempo de espera agotado"
-                    ? "La conexión tardó demasiado. Intenta refrescar de nuevo."
-                    : "Error cargando carpetas. Verifica tu conexión."
-                )
-            }
+            // Alert removed as per user request to avoid "La conexión tardó demasiado" noise
         } finally {
             if (!silent) setLoadingFolders(false)
         }
