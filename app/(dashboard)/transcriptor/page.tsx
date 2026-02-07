@@ -5,7 +5,7 @@ import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Upload, Play, Save, Copy, FolderPlus, Folder, X, CheckCircle, Clock, Loader2, AlertCircle, Eye, Pencil } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, Copy, Eye, FileText, Loader2, Play, Save, Trash2, Upload, X, Folder, FolderPlus, Search } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
