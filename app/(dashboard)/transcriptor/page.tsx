@@ -5,7 +5,7 @@ import { useDropzone } from "react-dropzone"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { AlertCircle, CheckCircle, Clock, Copy, Eye, FileText, Loader2, Play, Save, Trash2, Upload, X, Folder, FolderPlus, Search } from 'lucide-react'
+import { AlertCircle, CheckCircle, Clock, Copy, Eye, Loader2, Play, Save, Upload, X, Folder, FolderPlus, Search, Pencil } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
@@ -547,7 +547,18 @@ export default function TranscriptorPage() {
                                         <Clock className={`h-3 w-3 ${loadingFolders ? 'animate-spin' : ''}`} />
                                     </Button>
                                 </div>
-                                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-1 relative">
+                                <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-1 relative">
+                                    <div className="sticky top-0 bg-background z-10 p-1 border-b mb-2">
+                                        <div className="relative">
+                                            <Search className="absolute left-2 top-2 h-3 w-3 text-muted-foreground" />
+                                            <Input
+                                                className="h-7 pl-7 text-xs"
+                                                placeholder="Buscar carpeta..."
+                                                value={folderSearchQuery}
+                                                onChange={(e) => setFolderSearchQuery(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
                                     {loadingFolders && folders.length === 0 && (
                                         <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
                                             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -556,11 +567,13 @@ export default function TranscriptorPage() {
                                     <button onClick={() => setSelectedFolderId(null)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === null ? 'bg-accent/50 text-primary' : ''}`}>
                                         <Folder className="h-4 w-4 opacity-50" /> Biblioteca (Raíz)
                                     </button>
-                                    {folders.map(f => (
-                                        <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
-                                            <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
-                                        </button>
-                                    ))}
+                                    {folders
+                                        .filter(f => f.name.toLowerCase().includes(folderSearchQuery.toLowerCase()))
+                                        .map(f => (
+                                            <button key={f.id} onClick={() => setSelectedFolderId(f.id)} className={`flex items-center gap-2 p-2 w-full text-sm hover:bg-accent rounded-sm ${selectedFolderId === f.id ? 'bg-accent/50 text-primary' : ''}`}>
+                                                <Folder className="h-4 w-4 text-yellow-500" /> {f.name}
+                                            </button>
+                                        ))}
                                 </div>
                                 {!isCreatingFolder ? (
                                     <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => setIsCreatingFolder(true)}>
