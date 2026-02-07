@@ -44,9 +44,11 @@ export default function TranscriptorPage() {
     }, [showToast, toastStatus])
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState("")
+    const [folderSearchQuery, setFolderSearchQuery] = useState("")
 
     // Preview/Edit State
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+
     const [previewItem, setPreviewItem] = useState<QueueItem | null>(null)
     const [previewText, setPreviewText] = useState("")
 
