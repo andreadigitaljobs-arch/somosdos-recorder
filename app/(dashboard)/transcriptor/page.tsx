@@ -62,7 +62,17 @@ export default function TranscriptorPage() {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'audio/*': [], 'video/*': [] },
+        accept: {
+            'audio/*': [],
+            'video/*': [],
+            'audio/mpeg': ['.mp3', '.m4a'],
+            'audio/mp4': ['.m4a', '.mp4'],
+            'audio/x-m4a': ['.m4a'],
+            'audio/aac': ['.aac'],
+            'audio/ogg': ['.ogg', '.oga'],
+            'audio/wav': ['.wav'],
+            'audio/webm': ['.weba']
+        },
         maxFiles: 10
     })
 
