@@ -224,24 +224,24 @@ export default function LibraryPage() {
         try {
             setExportStatus("Analizando...")
 
-            // 1. Fetch ALL files in space (bypass pagination)
-            // We need storage_path to download
-            let allFiles: { id: string, name: string, storage_path: string }[] = []
+            // 1. Fetch ALL items in space (files + folders) to reconstructing paths
+            // We need storage_path only for files, but parent_id and name for folders
+            let allItems: { id: string, name: string, type: string, parent_id: string | null, storage_path?: string }[] = []
             let page = 0
             const pageSize = 1000
 
             while (true) {
                 const { data, error } = await supabase
                     .from('files')
-                    .select('id, name, storage_path')
+                    .select('id, name, type, parent_id, storage_path')
                     .eq('space_id', currentSpace.id)
-                    .eq('type', 'file') // Only files, not folders
+                    // Removed .eq('type', 'file') to fetch folders too
                     .range(page * pageSize, (page + 1) * pageSize - 1)
 
                 if (error) throw error
                 if (!data || data.length === 0) break
 
-                allFiles = [...allFiles, ...data]
+                allItems = [...allItems, ...data]
                 if (data.length < pageSize) break
                 page++
             }
