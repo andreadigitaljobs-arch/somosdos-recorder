@@ -179,8 +179,8 @@ export default function DashboardPage() {
                                             <div className={`p-2 rounded-full ${item.color}`}>
                                                 <item.icon className="h-4 w-4" />
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium leading-none">{item.title}</span>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-sm font-medium leading-none truncate" title={item.title}>{item.title}</span>
                                                 <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
                                                     <Clock className="h-3 w-3" />
                                                     {formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })}

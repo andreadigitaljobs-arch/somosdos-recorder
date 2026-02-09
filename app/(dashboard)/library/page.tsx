@@ -902,7 +902,7 @@ export default function LibraryPage() {
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-sm">
+                                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-sm">
                                             <MoreVertical className="h-3 w-3" />
                                         </Button>
                                     </DropdownMenuTrigger>
