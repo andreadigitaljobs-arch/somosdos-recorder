@@ -666,328 +666,328 @@ export default function LibraryPage() {
                                 )}
                             </Button>
 
-                        </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="hidden md:flex gap-2"
-                            onClick={handleTextExport}
-                            disabled={!!exportStatus}
-                            title="Exportar todo el texto a un solo archivo .txt"
-                        >
-                            <FileText className="h-4 w-4" />
-                            {exportStatus && exportStatus.includes("textos") ? "Descargando..." : "Texto"}
-                        </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="hidden md:flex gap-2"
-                            onClick={handleZipExport}
-                            disabled={!!exportStatus}
-                            title="Descargar todos los archivos como ZIP"
-                        >
-                            {exportStatus && !exportStatus.includes("textos") ? (
-                                <span className="animate-pulse text-xs">{exportStatus}</span>
-                            ) : (
-                                <>
-                                    <CornerUpLeft className="h-4 w-4 rotate-45" /> ZIP
-                                </>
-                            )}
-                        </Button>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleUpload}
-                        />
-                        <Button size="sm" variant="outline" onClick={handleUploadClick} disabled={uploading}>
-                            {uploading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                            {uploading ? "Subiendo..." : "Subir"}
-                        </Button>
-                        <Button size="sm" onClick={handleCreateFolder} disabled={isCreating || uploading}>
-                            {isCreating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                            {isCreating ? "Creando..." : "Carpeta"}
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Buscar..."
-                            className="pl-9 h-9"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                {/* Bulk Action Bar - Appears when items are selected */}
-                <AnimatePresence>
-                    {isSelectionMode && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="bg-primary/5 border rounded-lg p-2 px-4 flex items-center justified-between gap-4 overflow-hidden"
-                        >
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                                <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">
-                                    {selectedIds.size}
-                                </span>
-                                <span>seleccionado{selectedIds.size !== 1 && 's'}</span>
-                                <Button variant="ghost" size="sm" onClick={handleSelectAll} className="h-7 text-xs ml-2">
-                                    {selectedIds.size === filteredItems.length ? "Deseleccionar" : "Todos"}
-                                </Button>
-                            </div>
-
-                            <div className="flex items-center gap-2 ml-auto">
-                                <Button size="sm" variant="secondary" onClick={() => setIsMoveOpen(true)} className="h-8 shadow-sm">
-                                    <CornerUpLeft className="h-4 w-4 mr-2" /> Mover
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 shadow-sm">
-                                    <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                                </Button>
-                                <Button size="icon" variant="ghost" onClick={clearSelection} className="h-8 w-8 ml-2">
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-
-            {/* Breadcrumbs & Stats */ }
-        <div className="border-b pb-2">
-            {!searchQuery ? (
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
-                    {/* Línea 1: Breadcrumb with horizontal scroll on mobile */}
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground overflow-x-auto scrollbar-hide">
-                        <Button variant="ghost" size="sm" className="h-6 px-1 shrink-0" onClick={() => setCurrentFolderId(null)}>
-                            Inicio
-                        </Button>
-                        {getBreadcrumbs().slice(1).map((crumb) => (
-                            <div key={crumb.id} className="flex items-center shrink-0">
-                                <ChevronRight className="h-4 w-4 opacity-50" />
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className={`h-6 px-1 ${crumb.id === currentFolderId ? 'font-bold text-primary' : ''}`}
-                                    onClick={() => setCurrentFolderId(crumb.id as string)}
-                                >
-                                    {crumb.name}
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Línea 2: Counters (smaller, lower emphasis) */}
-                    <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3 shrink-0">
-                        <span>{currentViewStats.folders} carpetas</span>
-                        <span className="opacity-50">•</span>
-                        <span>{currentViewStats.files} archivos</span>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
-                    <div className="text-sm text-muted-foreground">Resultados de búsqueda</div>
-                    <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3">
-                        <span>{currentViewStats.folders} carpetas</span>
-                        <span className="opacity-50">•</span>
-                        <span>{currentViewStats.files} archivos</span>
-                    </div>
-                </div>
-            )}
-        </div>
-
-        {/* Grid */ }
-        <ScrollArea className="flex-1 -mx-4 px-4 pb-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 content-start">
-                {loading && <div className="col-span-full py-10 text-center text-muted-foreground">Cargando...</div>}
-
-                {!loading && filteredItems.length === 0 && (
-                    <div className="col-span-full py-12 flex flex-col items-center text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
-                        <Folder className="h-10 w-10 mb-2 opacity-20" />
-                        <p>Carpeta vacía</p>
-                    </div>
-                )}
-
-                {!loading && filteredItems.map(item => {
-                    const counts = item.type === 'folder' ? getChildCounts(item.id) : null
-
-                    return (
-                        <div
-                            key={item.id}
-                            className={`group relative flex flex-col items-center p-3 rounded-lg border transition-all cursor-pointer aspect-square
-                                    ${selectedIds.has(item.id)
-                                    ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary'
-                                    : 'bg-card hover:bg-accent/50 hover:shadow-md'}`}
-                            onClick={() => {
-                                if (isSelectionMode) toggleSelection(item.id)
-                                else item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)
-                            }}
-                            onDoubleClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
-                        >
-                            {/* Selection Checkbox (Visible on Hover or Selected) */}
-                            <div
-                                className={`absolute top-2 left-2 z-10 transition-opacity duration-200 
-                                        ${selectedIds.has(item.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="hidden md:flex gap-2"
+                                onClick={handleTextExport}
+                                disabled={!!exportStatus}
+                                title="Exportar todo el texto a un solo archivo .txt"
                             >
-                                <div
-                                    className={`w-5 h-5 rounded border shadow-sm flex items-center justify-center
-                                            ${selectedIds.has(item.id) ? 'bg-primary border-primary text-primary-foreground' : 'bg-background/80 border-muted-foreground/50 hover:border-primary'}`}
-                                    onClick={(e) => toggleSelection(item.id, e)}
-                                >
-                                    {selectedIds.has(item.id) && <Check className="h-3.5 w-3.5" />}
-                                </div>
-                            </div>
+                                <FileText className="h-4 w-4" />
+                                {exportStatus && exportStatus.includes("textos") ? "Descargando..." : "Texto"}
+                            </Button>
 
-                            <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105">
-                                {item.type === "folder" ? (
-                                    <div className="relative">
-                                        <Folder className="h-12 w-12 text-yellow-500 fill-yellow-500/20" />
-                                        {(counts?.files || 0) > 0 && (
-                                            <div className="absolute -bottom-1 -right-1 bg-background text-[9px] border font-bold px-1 rounded-full shadow-sm">
-                                                {counts?.files}
-                                            </div>
-                                        )}
-                                    </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="hidden md:flex gap-2"
+                                onClick={handleZipExport}
+                                disabled={!!exportStatus}
+                                title="Descargar todos los archivos como ZIP"
+                            >
+                                {exportStatus && !exportStatus.includes("textos") ? (
+                                    <span className="animate-pulse text-xs">{exportStatus}</span>
                                 ) : (
-                                    <FileText className="h-12 w-12 text-primary fill-primary/10" />
+                                    <>
+                                        <CornerUpLeft className="h-4 w-4 rotate-45" /> ZIP
+                                    </>
                                 )}
-                            </div>
-                            <div className="w-full text-center mt-2 space-y-0.5">
-                                <p className="text-xs font-medium truncate w-full" title={item.name}>{item.name}</p>
-                                {item.type === 'file' && item.size && (
-                                    <p className="text-[10px] text-muted-foreground">{item.size}</p>
-                                )}
-                                {item.type === 'folder' && counts && (
-                                    <p className="text-[9px] text-muted-foreground">
-                                        {counts.folders > 0 ? `${counts.folders} carp, ` : ''}{counts.files} arch
-                                    </p>
-                                )}
-                            </div>
-
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-sm">
-                                        <MoreVertical className="h-3 w-3" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    {item.type === 'file' && (
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePreview(item) }}>
-                                            <Eye className="h-4 w-4 mr-2" /> Ver
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openRename(item) }}>
-                                        <Pencil className="h-4 w-4 mr-2" /> Renombrar
-                                    </DropdownMenuItem>
-                                    {item.type === 'file' && (
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopy(item) }}>
-                                            <Copy className="h-4 w-4 mr-2" /> Copiar Contenido
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMove(item) }}>
-                                        <FolderInput className="h-4 w-4 mr-2" /> Mover
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(item) }}>
-                                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            </Button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleUpload}
+                            />
+                            <Button size="sm" variant="outline" onClick={handleUploadClick} disabled={uploading}>
+                                {uploading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                                {uploading ? "Subiendo..." : "Subir"}
+                            </Button>
+                            <Button size="sm" onClick={handleCreateFolder} disabled={isCreating || uploading}>
+                                {isCreating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                {isCreating ? "Creando..." : "Carpeta"}
+                            </Button>
                         </div>
-                    )
-                })}
-            </div>
-        </ScrollArea>
+                    </div>
 
-        {/* Rename Modal */ }
-        <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Renombrar</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                    <Label>Nuevo nombre</Label>
-                    <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-2" />
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsRenameOpen(false)}>Cancelar</Button>
-                    <Button onClick={confirmRename}>Guardar</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar..."
+                                className="pl-9 h-9"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                    </div>
 
-        {/* Move Modal */ }
-        <Dialog open={isMoveOpen} onOpenChange={setIsMoveOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Mover "{itemToMove?.name}" a...</DialogTitle>
-                </DialogHeader>
-                <div className="py-4 space-y-2 max-h-[300px] overflow-y-auto">
-                    <Button
-                        variant="ghost"
-                        className={`w-full justify-start ${targetFolderId === null ? 'bg-accent' : ''}`}
-                        onClick={() => setTargetFolderId(null)}
-                    >
-                        <CornerUpLeft className="h-4 w-4 mr-2" /> Raíz (Biblioteca)
-                    </Button>
-
-                    {allFolders.map(folder => (
-                        <Button
-                            key={folder.id}
-                            variant="ghost"
-                            className={`w-full justify-start pl-8 ${targetFolderId === folder.id ? 'bg-accent' : ''}`}
-                            onClick={() => setTargetFolderId(folder.id)}
-                        >
-                            <Folder className="h-4 w-4 mr-2 text-yellow-500" /> {folder.name}
-                        </Button>
-                    ))}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsMoveOpen(false)}>Cancelar</Button>
-                    <Button onClick={confirmMove}>Mover aquí</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-
-        {/* Preview Modal */ }
-        <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-            <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>{previewItem?.name}</DialogTitle>
-                </DialogHeader>
-                <div className="flex-1 overflow-y-auto min-h-[300px] bg-muted/20 p-4 rounded text-sm font-mono whitespace-pre-wrap border relative">
-                    <AnimatePresence mode="wait">
-                        {isLoadingPreview ? (
+                    {/* Bulk Action Bar - Appears when items are selected */}
+                    <AnimatePresence>
+                        {isSelectionMode && (
                             <motion.div
-                                key="loading"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 flex items-center justify-center"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="bg-primary/5 border rounded-lg p-2 px-4 flex items-center justified-between gap-4 overflow-hidden"
                             >
-                                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="content"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 1.2, ease: "easeOut" }}
-                                className="h-full"
-                            >
-                                {previewContent}
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                                        {selectedIds.size}
+                                    </span>
+                                    <span>seleccionado{selectedIds.size !== 1 && 's'}</span>
+                                    <Button variant="ghost" size="sm" onClick={handleSelectAll} className="h-7 text-xs ml-2">
+                                        {selectedIds.size === filteredItems.length ? "Deseleccionar" : "Todos"}
+                                    </Button>
+                                </div>
+
+                                <div className="flex items-center gap-2 ml-auto">
+                                    <Button size="sm" variant="secondary" onClick={() => setIsMoveOpen(true)} className="h-8 shadow-sm">
+                                        <CornerUpLeft className="h-4 w-4 mr-2" /> Mover
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={handleBulkDelete} className="h-8 shadow-sm">
+                                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={clearSelection} className="h-8 w-8 ml-2">
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </div>
-            </DialogContent>
-        </Dialog>
-        </div >
-    )
-}
+
+                {/* Breadcrumbs & Stats */}
+                <div className="border-b pb-2">
+                    {!searchQuery ? (
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
+                            {/* Línea 1: Breadcrumb with horizontal scroll on mobile */}
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground overflow-x-auto scrollbar-hide">
+                                <Button variant="ghost" size="sm" className="h-6 px-1 shrink-0" onClick={() => setCurrentFolderId(null)}>
+                                    Inicio
+                                </Button>
+                                {getBreadcrumbs().slice(1).map((crumb) => (
+                                    <div key={crumb.id} className="flex items-center shrink-0">
+                                        <ChevronRight className="h-4 w-4 opacity-50" />
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`h-6 px-1 ${crumb.id === currentFolderId ? 'font-bold text-primary' : ''}`}
+                                            onClick={() => setCurrentFolderId(crumb.id as string)}
+                                        >
+                                            {crumb.name}
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* Línea 2: Counters (smaller, lower emphasis) */}
+                            <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3 shrink-0">
+                                <span>{currentViewStats.folders} carpetas</span>
+                                <span className="opacity-50">•</span>
+                                <span>{currentViewStats.files} archivos</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1.5">
+                            <div className="text-sm text-muted-foreground">Resultados de búsqueda</div>
+                            <div className="text-[11px] md:text-xs text-muted-foreground/70 flex gap-2 md:gap-3">
+                                <span>{currentViewStats.folders} carpetas</span>
+                                <span className="opacity-50">•</span>
+                                <span>{currentViewStats.files} archivos</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Grid */}
+                <ScrollArea className="flex-1 -mx-4 px-4 pb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 content-start">
+                        {loading && <div className="col-span-full py-10 text-center text-muted-foreground">Cargando...</div>}
+
+                        {!loading && filteredItems.length === 0 && (
+                            <div className="col-span-full py-12 flex flex-col items-center text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
+                                <Folder className="h-10 w-10 mb-2 opacity-20" />
+                                <p>Carpeta vacía</p>
+                            </div>
+                        )}
+
+                        {!loading && filteredItems.map(item => {
+                            const counts = item.type === 'folder' ? getChildCounts(item.id) : null
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    className={`group relative flex flex-col items-center p-3 rounded-lg border transition-all cursor-pointer aspect-square
+                                    ${selectedIds.has(item.id)
+                                            ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary'
+                                            : 'bg-card hover:bg-accent/50 hover:shadow-md'}`}
+                                    onClick={() => {
+                                        if (isSelectionMode) toggleSelection(item.id)
+                                        else item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)
+                                    }}
+                                    onDoubleClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
+                                >
+                                    {/* Selection Checkbox (Visible on Hover or Selected) */}
+                                    <div
+                                        className={`absolute top-2 left-2 z-10 transition-opacity duration-200 
+                                        ${selectedIds.has(item.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                    >
+                                        <div
+                                            className={`w-5 h-5 rounded border shadow-sm flex items-center justify-center
+                                            ${selectedIds.has(item.id) ? 'bg-primary border-primary text-primary-foreground' : 'bg-background/80 border-muted-foreground/50 hover:border-primary'}`}
+                                            onClick={(e) => toggleSelection(item.id, e)}
+                                        >
+                                            {selectedIds.has(item.id) && <Check className="h-3.5 w-3.5" />}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 flex items-center justify-center w-full transition-transform group-hover:scale-105">
+                                        {item.type === "folder" ? (
+                                            <div className="relative">
+                                                <Folder className="h-12 w-12 text-yellow-500 fill-yellow-500/20" />
+                                                {(counts?.files || 0) > 0 && (
+                                                    <div className="absolute -bottom-1 -right-1 bg-background text-[9px] border font-bold px-1 rounded-full shadow-sm">
+                                                        {counts?.files}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <FileText className="h-12 w-12 text-primary fill-primary/10" />
+                                        )}
+                                    </div>
+                                    <div className="w-full text-center mt-2 space-y-0.5">
+                                        <p className="text-xs font-medium truncate w-full" title={item.name}>{item.name}</p>
+                                        {item.type === 'file' && item.size && (
+                                            <p className="text-[10px] text-muted-foreground">{item.size}</p>
+                                        )}
+                                        {item.type === 'folder' && counts && (
+                                            <p className="text-[9px] text-muted-foreground">
+                                                {counts.folders > 0 ? `${counts.folders} carp, ` : ''}{counts.files} arch
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-sm">
+                                                <MoreVertical className="h-3 w-3" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            {item.type === 'file' && (
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePreview(item) }}>
+                                                    <Eye className="h-4 w-4 mr-2" /> Ver
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openRename(item) }}>
+                                                <Pencil className="h-4 w-4 mr-2" /> Renombrar
+                                            </DropdownMenuItem>
+                                            {item.type === 'file' && (
+                                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCopy(item) }}>
+                                                    <Copy className="h-4 w-4 mr-2" /> Copiar Contenido
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openMove(item) }}>
+                                                <FolderInput className="h-4 w-4 mr-2" /> Mover
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(item) }}>
+                                                <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </ScrollArea>
+
+                {/* Rename Modal */}
+                <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Renombrar</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Label>Nuevo nombre</Label>
+                            <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-2" />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsRenameOpen(false)}>Cancelar</Button>
+                            <Button onClick={confirmRename}>Guardar</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Move Modal */}
+                <Dialog open={isMoveOpen} onOpenChange={setIsMoveOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Mover "{itemToMove?.name}" a...</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4 space-y-2 max-h-[300px] overflow-y-auto">
+                            <Button
+                                variant="ghost"
+                                className={`w-full justify-start ${targetFolderId === null ? 'bg-accent' : ''}`}
+                                onClick={() => setTargetFolderId(null)}
+                            >
+                                <CornerUpLeft className="h-4 w-4 mr-2" /> Raíz (Biblioteca)
+                            </Button>
+
+                            {allFolders.map(folder => (
+                                <Button
+                                    key={folder.id}
+                                    variant="ghost"
+                                    className={`w-full justify-start pl-8 ${targetFolderId === folder.id ? 'bg-accent' : ''}`}
+                                    onClick={() => setTargetFolderId(folder.id)}
+                                >
+                                    <Folder className="h-4 w-4 mr-2 text-yellow-500" /> {folder.name}
+                                </Button>
+                            ))}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsMoveOpen(false)}>Cancelar</Button>
+                            <Button onClick={confirmMove}>Mover aquí</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Preview Modal */}
+                <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                    <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                        <DialogHeader>
+                            <DialogTitle>{previewItem?.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-1 overflow-y-auto min-h-[300px] bg-muted/20 p-4 rounded text-sm font-mono whitespace-pre-wrap border relative">
+                            <AnimatePresence mode="wait">
+                                {isLoadingPreview ? (
+                                    <motion.div
+                                        key="loading"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="absolute inset-0 flex items-center justify-center"
+                                    >
+                                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="content"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 1.2, ease: "easeOut" }}
+                                        className="h-full"
+                                    >
+                                        {previewContent}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div >
+        )
+    }
