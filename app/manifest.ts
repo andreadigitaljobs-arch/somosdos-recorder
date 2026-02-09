@@ -11,14 +11,14 @@ export default function manifest(): MetadataRoute.Manifest {
         theme_color: '#7c3aed', // Violet-600 (Primary brand color)
         icons: [
             {
-                src: '/icon.png',
+                src: '/icon.jpg',
                 sizes: '192x192',
-                type: 'image/png',
+                type: 'image/jpeg',
             },
             {
-                src: '/icon.png',
+                src: '/icon.jpg',
                 sizes: '512x512',
-                type: 'image/png',
+                type: 'image/jpeg',
             },
         ],
     }

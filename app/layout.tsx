@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     title: 'E-Education',
   },
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: '/icon.jpg',
+    apple: '/icon.jpg',
   },
   formatDetection: {
     telephone: false,
