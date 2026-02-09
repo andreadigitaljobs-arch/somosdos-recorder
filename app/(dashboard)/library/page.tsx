@@ -225,14 +225,15 @@ export default function LibraryPage() {
             setExportStatus("Analizando...")
 
             // 1. Fetch ALL files in space (bypass pagination)
-            let allFiles: { id: string, name: string }[] = []
+            // We need storage_path to download
+            let allFiles: { id: string, name: string, storage_path: string }[] = []
             let page = 0
             const pageSize = 1000
 
             while (true) {
                 const { data, error } = await supabase
                     .from('files')
-                    .select('id, name')
+                    .select('id, name, storage_path')
                     .eq('space_id', currentSpace.id)
                     .eq('type', 'file') // Only files, not folders
                     .range(page * pageSize, (page + 1) * pageSize - 1)
@@ -250,59 +251,56 @@ export default function LibraryPage() {
                 return
             }
 
-            setExportStatus(`Descargando ${allFiles.length} textos...`)
+            // 2. Filter for Text Files (Transcriptions are saved as .txt)
+            const textFiles = allFiles.filter(f =>
+                f.name.toLowerCase().endsWith('.txt') ||
+                f.name.toLowerCase().endsWith('.md')
+            ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
 
-            // 2. Fetch transcriptions in chunks (to avoid query too large)
-            const fileIds = allFiles.map(f => f.id)
-            let allTranscriptions: { file_id: string, content: string }[] = []
-            const chunkSize = 100 // Safe chunk size for IN query
-
-            for (let i = 0; i < fileIds.length; i += chunkSize) {
-                const chunk = fileIds.slice(i, i + chunkSize)
-                const { data: transData, error: transError } = await supabase
-                    .from('transcriptions')
-                    .select('file_id, content')
-                    .in('file_id', chunk)
-
-                if (transError) throw transError
-                if (transData) {
-                    // Filter out null/empty content
-                    const validTrans = transData.filter((t: any) => t.content) as any[]
-                    allTranscriptions = [...allTranscriptions, ...validTrans]
-                }
-            }
-
-            if (allTranscriptions.length === 0) {
-                alert("No se encontraron transcripciones para exportar.")
+            if (textFiles.length === 0) {
+                alert("No se encontraron archivos de texto (.txt) para exportar. Asegúrate de haber guardado las transcripciones.")
                 return
             }
 
-            // 3. Build Huge String
-            setExportStatus("Generando archivo...")
+            setExportStatus(`Descargando ${textFiles.length} transcripciones...`)
 
+            // 3. Download & Build Huge String
             let fullText = `ESPACIO DE ESTUDIO: ${currentSpace.name.toUpperCase()}\n`
             fullText += `FECHA DE EXPORTACIÓN: ${new Date().toLocaleString()}\n`
-            fullText += `ARCHIVOS TRANSCRITOS: ${allTranscriptions.length}/${allFiles.length}\n`
+            fullText += `ARCHIVOS ENCONTRADOS: ${textFiles.length}\n`
             fullText += `================================================================================\n\n`
-
-            // Create a Map for O(1) Access
-            const transMap = new Map(allTranscriptions.map(t => [t.file_id, t.content]))
 
             let processedCount = 0
 
-            // Iterate over FILES to keep some order (if DB returned ordered) 
-            // Ideally we should sort by name, they come semi-random from pagination if not sorted
-            allFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+            for (const file of textFiles) {
+                try {
+                    // Update UI every few files
+                    if (processedCount % 5 === 0) {
+                        setExportStatus(`Procesando ${processedCount + 1}/${textFiles.length}...`)
+                    }
 
-            for (const file of allFiles) {
-                const content = transMap.get(file.id)
-                if (content) {
+                    if (!file.storage_path) continue
+
+                    const { data, error } = await supabase.storage
+                        .from('library_files')
+                        .download(file.storage_path)
+
+                    if (error) {
+                        console.error(`Error downloading ${file.name}`, error)
+                        continue
+                    }
+
+                    const text = await data.text()
+
                     fullText += `\n\n`
                     fullText += `--------------------------------------------------------------------------------\n`
                     fullText += `ARCHIVO: ${file.name}\n`
                     fullText += `--------------------------------------------------------------------------------\n\n`
-                    fullText += `${content}\n`
+                    fullText += `${text}\n`
+
                     processedCount++
+                } catch (e) {
+                    console.error(`Unexpected error processing ${file.name}`, e)
                 }
             }
 
