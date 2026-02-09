@@ -251,12 +251,30 @@ export default function LibraryPage() {
                 return
             }
 
+            // 2. Build Folder Path Map
+            const folderMap = new Map<string, string>()
+            allItems.filter(i => i.type === 'folder').forEach(f => folderMap.set(f.id, f.name))
+
+            // Helper to get full path
+            const getPath = (parentId: string | null): string => {
+                if (!parentId) return ""
+                const parentName = folderMap.get(parentId)
+                if (!parentName) return ""
+                return parentName + " / "
+            }
+
             // 2. Filter for Text Files (Transcriptions are saved as .txt)
             const textFiles = allItems.filter(f =>
                 (f.name.toLowerCase().endsWith('.txt') ||
                     f.name.toLowerCase().endsWith('.md')) &&
                 f.type === 'file'
-            ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+            ).sort((a, b) => {
+                // Sort by Path then Name
+                const pathA = getPath(a.parent_id)
+                const pathB = getPath(b.parent_id)
+                if (pathA !== pathB) return pathA.localeCompare(pathB)
+                return a.name.localeCompare(b.name, undefined, { numeric: true })
+            })
 
             if (textFiles.length === 0) {
                 alert("No se encontraron archivos de texto (.txt) para exportar. Asegúrate de haber guardado las transcripciones.")
