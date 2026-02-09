@@ -175,7 +175,7 @@ export default function DashboardPage() {
                             <div className="space-y-3">
                                 {activities.map((item) => (
                                     <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-accent/40 transition-colors group">
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`p-2 rounded-full ${item.color}`}>
                                                 <item.icon className="h-4 w-4" />
                                             </div>
