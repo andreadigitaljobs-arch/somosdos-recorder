@@ -854,11 +854,14 @@ export default function LibraryPage() {
                                     ${selectedIds.has(item.id)
                                         ? 'bg-primary/10 border-primary shadow-sm ring-1 ring-primary'
                                         : 'bg-card hover:bg-accent/50 hover:shadow-md'}`}
-                                onClick={() => {
+                                onClick={(e) => {
                                     if (isSelectionMode) toggleSelection(item.id)
-                                    else item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)
+                                    else {
+                                        // Standardize on Single Click to Open
+                                        item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)
+                                    }
                                 }}
-                                onDoubleClick={() => item.type === "folder" ? setCurrentFolderId(item.id) : handlePreview(item)}
+                            // onDoubleClick removed to prevent race conditions
                             >
                                 {/* Selection Checkbox (Visible on Hover or Selected) */}
                                 <div
