@@ -281,8 +281,8 @@ export default function LibraryPage() {
                 return
             }
 
-            setExportStatus(`[v2] Preparando exportación de ${textFiles.length} archivos...`)
-            console.log("EXPORT START v2 - Items Found:", allItems.length, "Files:", textFiles.length)
+            setExportStatus(`Preparando exportación de ${textFiles.length} archivos...`)
+            console.log("EXPORT START - Items Found:", allItems.length, "Files:", textFiles.length)
 
             // 4. Download & Build String
             let fullText = `ESPACIO DE ESTUDIO: ${currentSpace.name.toUpperCase()}\n`
@@ -707,7 +707,7 @@ export default function LibraryPage() {
                             title="Exportar todo el texto a un solo archivo .txt"
                         >
                             <FileText className="h-4 w-4" />
-                            {exportStatus ? exportStatus : "TXT v3"}
+                            {exportStatus ? exportStatus : "Texto"}
                         </Button>
 
                         <Button
