@@ -251,16 +251,16 @@ export default function LibraryPage() {
                 return
             }
 
-            // 2. Build Folder Path Map
-            const folderMap = new Map<string, string>()
-            allItems.filter(i => i.type === 'folder').forEach(f => folderMap.set(f.id, f.name))
+            // 2. Build Folder Path Map (Recursive)
+            const folderMap = new Map<string, { name: string, parentId: string | null }>()
+            allItems.filter(i => i.type === 'folder').forEach(f => folderMap.set(f.id, { name: f.name, parentId: f.parent_id }))
 
-            // Helper to get full path
-            const getPath = (parentId: string | null): string => {
-                if (!parentId) return ""
-                const parentName = folderMap.get(parentId)
-                if (!parentName) return ""
-                return parentName + " / "
+            // Recursive path helper
+            const getPath = (folderId: string | null): string => {
+                if (!folderId) return ""
+                const folder = folderMap.get(folderId)
+                if (!folder) return ""
+                return getPath(folder.parentId) + folder.name + " / "
             }
 
             // 2. Filter for Text Files (Transcriptions are saved as .txt)
@@ -281,7 +281,8 @@ export default function LibraryPage() {
                 return
             }
 
-            setExportStatus(`Descargando ${textFiles.length} archivos...`)
+            setExportStatus(`[v2] Preparando exportación de ${textFiles.length} archivos...`)
+            console.log("EXPORT START v2 - Items Found:", allItems.length, "Files:", textFiles.length)
 
             // 4. Download & Build String
             let fullText = `ESPACIO DE ESTUDIO: ${currentSpace.name.toUpperCase()}\n`
@@ -290,13 +291,14 @@ export default function LibraryPage() {
             fullText += `================================================================================\n\n`
 
             let processedCount = 0
+            let successCount = 0
+            let invalidPathCount = 0
 
             for (const file of textFiles) {
                 try {
-                    // Update UI every few files
-                    if (processedCount % 5 === 0) {
-                        setExportStatus(`Procesando ${processedCount + 1}/${textFiles.length}...`)
-                    }
+                    processedCount++
+                    // Update UI every 5 files
+                    if (processedCount % 5 === 0) setExportStatus(`Procesando ${processedCount}/${textFiles.length}...`)
 
                     if (!file.storage_path) continue
 
@@ -310,18 +312,26 @@ export default function LibraryPage() {
                     }
 
                     const text = await data.text()
+                    const pathPrefix = getPath(file.parent_id)
 
-                    fullText += `\n\n`
+                    fullText += `\n`
                     fullText += `--------------------------------------------------------------------------------\n`
-                    fullText += `ARCHIVO: ${file.name}\n`
-                    fullText += `--------------------------------------------------------------------------------\n\n`
-                    fullText += `${text}\n`
+                    fullText += `ARCHIVO ${processedCount}/${textFiles.length}: ${pathPrefix}${file.name}\n`
+                    fullText += `--------------------------------------------------------------------------------\n`
+                    fullText += `${text}\n\n`
 
-                    processedCount++
+                    successCount++
                 } catch (e) {
-                    console.error(`Unexpected error processing ${file.name}`, e)
+                    console.error(`Error processing ${file.name}`, e)
                 }
             }
+
+            fullText += `\n================================================================================\n`
+            fullText += `RESUMEN FINAL:\n`
+            fullText += `- Procesados: ${successCount}\n`
+            fullText += `- Sin Ruta: ${invalidPathCount}\n`
+            fullText += `- Total Encontrados: ${textFiles.length}\n`
+            fullText += `================================================================================\n`
 
             // 4. Download Blob
             const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' })
@@ -697,7 +707,7 @@ export default function LibraryPage() {
                             title="Exportar todo el texto a un solo archivo .txt"
                         >
                             <FileText className="h-4 w-4" />
-                            {exportStatus && exportStatus.includes("textos") ? "Descargando..." : "Texto"}
+                            {exportStatus ? exportStatus : "TXT v3"}
                         </Button>
 
                         <Button
