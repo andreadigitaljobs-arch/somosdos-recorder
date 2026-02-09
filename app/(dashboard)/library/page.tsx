@@ -246,15 +246,16 @@ export default function LibraryPage() {
                 page++
             }
 
-            if (allFiles.length === 0) {
+            if (allItems.length === 0) {
                 alert("No hay archivos en este espacio.")
                 return
             }
 
             // 2. Filter for Text Files (Transcriptions are saved as .txt)
-            const textFiles = allFiles.filter(f =>
-                f.name.toLowerCase().endsWith('.txt') ||
-                f.name.toLowerCase().endsWith('.md')
+            const textFiles = allItems.filter(f =>
+                (f.name.toLowerCase().endsWith('.txt') ||
+                    f.name.toLowerCase().endsWith('.md')) &&
+                f.type === 'file'
             ).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
 
             if (textFiles.length === 0) {
