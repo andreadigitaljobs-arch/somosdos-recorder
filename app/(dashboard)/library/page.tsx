@@ -61,6 +61,14 @@ export default function LibraryPage() {
     const [itemToMove, setItemToMove] = useState<FileSystemItem | null>(null)
     const [targetFolderId, setTargetFolderId] = useState<string | null>(null)
 
+    // --- Filtering (Moved up for scope) ---
+    const filteredItems = items.filter(item => {
+        if (searchQuery) {
+            return item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        }
+        return item.parentId === currentFolderId
+    })
+
     // --- Bulk Selection State ---
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const isSelectionMode = selectedIds.size > 0
