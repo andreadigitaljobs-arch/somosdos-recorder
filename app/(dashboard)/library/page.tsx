@@ -287,8 +287,6 @@ export default function LibraryPage() {
             let fullText = `ESPACIO DE ESTUDIO: ${currentSpace.name.toUpperCase()}\n`
             fullText += `FECHA: ${new Date().toLocaleString()}\n`
             fullText += `TOTAL ARCHIVOS: ${textFiles.length}\n`
-            fullText += `FECHA DE EXPORTACIÓN: ${new Date().toLocaleString()}\n`
-            fullText += `ARCHIVOS ENCONTRADOS: ${textFiles.length}\n`
             fullText += `================================================================================\n\n`
 
             let processedCount = 0
