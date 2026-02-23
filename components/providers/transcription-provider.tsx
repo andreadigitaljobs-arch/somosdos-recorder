@@ -157,7 +157,7 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                     try {
                         chunks = await processFileIntoChunks(
                             pendingItem.file,
-                            2, // 2-minute chunks (Safe for File API)
+                            10, // 10-minute chunks (fewer API calls, avoids rate limiting)
                             (stage, progress, details) => {
                                 if (stage === 'extract') {
                                     updateItemStatus(pendingItem.id, 'processing', Math.round(5 + (progress * 0.15)), undefined, undefined, currentExtractMsg)
@@ -196,20 +196,41 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                         });
                         const base64Data = await base64Promise;
 
-                        // Call SERVER ACTION
+                        // Call SERVER ACTION with retry logic
                         const { transcribeAudio } = await safeImport(() => import("@/app/actions/transcribe"))
-                        const result = await transcribeAudio({
-                            fileBase64: base64Data,
-                            apiKey: localKey, // Pass local key if exists, or Server will use ENV
-                            mimeType: 'audio/mp3',
-                            originalName: `part_${i}_${safeName}`
-                        })
 
-                        if (result.error) {
+                        let result: any = null
+                        let retries = 0
+                        const maxRetries = 3
+
+                        while (retries < maxRetries) {
+                            result = await transcribeAudio({
+                                fileBase64: base64Data,
+                                apiKey: localKey,
+                                mimeType: 'audio/mp3',
+                                originalName: `part_${i}_${safeName}`
+                            })
+
+                            if (!result.error) break
+
+                            retries++
+                            if (retries < maxRetries) {
+                                const waitSec = retries * 5 // 5s, 10s
+                                updateItemStatus(pendingItem.id, 'processing', Math.round(chunkProgress), undefined, undefined, `Reintentando bloque ${i + 1} en ${waitSec}s...`)
+                                await new Promise(r => setTimeout(r, waitSec * 1000))
+                            }
+                        }
+
+                        if (result?.error) {
                             throw new Error(`Error en bloque ${i + 1}: ${result.error}`)
                         }
 
-                        transcriptions.push(result.transcription || "")
+                        transcriptions.push(result?.transcription || "")
+
+                        // Small delay between chunks to avoid rate limiting
+                        if (i < chunks.length - 1) {
+                            await new Promise(r => setTimeout(r, 2000))
+                        }
                     }
 
                     // Step 3: Combine
