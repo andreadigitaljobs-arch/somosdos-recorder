@@ -148,7 +148,8 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                 if (useChunking) {
                     // === CHUNKED PROCESSING (For files > 95MB) ===
                     let currentExtractMsg = getRandomMessage('extract')
-                    updateItemStatus(pendingItem.id, 'processing', 5, undefined, undefined, currentExtractMsg)
+                    let maxProgress = 5 // Track max to prevent bar from going backward
+                    updateItemStatus(pendingItem.id, 'processing', maxProgress, undefined, undefined, currentExtractMsg)
 
                     // Step 1: Extract and split audio
                     const { processFileIntoChunks } = await safeImport(() => import('@/lib/audio-chunker'))
@@ -159,11 +160,17 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                             pendingItem.file,
                             10, // 10-minute chunks (fewer API calls, avoids rate limiting)
                             (stage, progress, details) => {
+                                let newProgress = maxProgress
                                 if (stage === 'extract') {
-                                    updateItemStatus(pendingItem.id, 'processing', Math.round(5 + (progress * 0.15)), undefined, undefined, currentExtractMsg)
+                                    newProgress = Math.round(5 + (progress * 0.15))
                                 } else if (stage === 'split') {
                                     if (progress === 0) currentExtractMsg = getRandomMessage('split')
-                                    updateItemStatus(pendingItem.id, 'processing', Math.round(20 + (progress * 0.1)), undefined, undefined, currentExtractMsg)
+                                    newProgress = Math.round(20 + (progress * 0.1))
+                                }
+                                // Only update if progress is higher (never go backward)
+                                if (newProgress > maxProgress) {
+                                    maxProgress = newProgress
+                                    updateItemStatus(pendingItem.id, 'processing', maxProgress, undefined, undefined, currentExtractMsg)
                                 }
                             }
                         )
