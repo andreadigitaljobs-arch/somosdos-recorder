@@ -141,7 +141,10 @@ export async function transcribeAudio(params: TranscribeParams) {
         for (const modelName of modelsToTry) {
             try {
                 console.log(`Attempting transcription with model: ${modelName}`);
-                const model = genAI.getGenerativeModel({ model: modelName });
+                const model = genAI.getGenerativeModel({
+                    model: modelName,
+                    generationConfig: { maxOutputTokens: 65536 },
+                });
                 const result = await model.generateContent(promptParts);
                 transcriptionText = result.response.text();
                 successModel = modelName;

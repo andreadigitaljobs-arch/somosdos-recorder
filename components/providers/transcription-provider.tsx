@@ -123,10 +123,11 @@ export function TranscriptionProvider({ children }: { children: ReactNode }) {
                 const safeName = pendingItem.file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
 
                 // Check if file needs chunking
-                // RAISED LIMIT TO 95MB because Next.js Server Actions allow 200MB (configured in next.config.ts)
-                // We leave some margin. 25MB file will now be SINGLE UPLOAD (Faster & Safer)
+                // LOWERED to 20MB: files >20MB get chunked into 10-min segments
+                // This ensures long audio (e.g. 52MB/1.5hr) is fully transcribed
+                // instead of hitting Gemini's output token limit
                 const { shouldUseChunking } = await import('@/lib/audio-chunker')
-                const useChunking = shouldUseChunking(pendingItem.file, 95)
+                const useChunking = shouldUseChunking(pendingItem.file, 20)
 
                 // Helper to safely import with version check
                 async function safeImport<T>(importFn: () => Promise<T>): Promise<T> {

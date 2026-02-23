@@ -77,7 +77,10 @@ export async function POST(req: NextRequest) {
         for (const modelName of modelsToTry) {
             try {
                 console.log(`Attempting transcription with model: ${modelName}`);
-                const model = genAI.getGenerativeModel({ model: modelName });
+                const model = genAI.getGenerativeModel({
+                    model: modelName,
+                    generationConfig: { maxOutputTokens: 65536 },
+                });
 
                 result = await model.generateContent([
                     prompt,
