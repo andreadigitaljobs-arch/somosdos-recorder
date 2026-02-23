@@ -9,6 +9,9 @@ import { finished } from "stream/promises";
 import path from "path";
 import os from "os";
 
+// Allow up to 5 minutes for long audio processing on Railway
+export const maxDuration = 300;
+
 // Types
 type TranscribeParams = {
     fileBase64?: string;
@@ -121,17 +124,12 @@ export async function transcribeAudio(params: TranscribeParams) {
             { fileData: { mimeType: uploadResult.file.mimeType, fileUri: fileUri } }
         ];
 
-        // 3. Generate Content
-        // EXHAUSTIVE MODEL LIST based on User's Diagnostic Dump
+        // 3. Generate with most reliable models first
         const modelsToTry = [
             "gemini-2.0-flash",
-            "gemini-2.0-flash-001",
-            "gemini-2.0-flash-lite-preview-02-05", // From List
-            "gemini-2.5-flash", // From List
+            "gemini-2.5-flash",
             "gemini-1.5-flash",
-            "gemini-1.5-flash-001",
             "gemini-1.5-pro",
-            "gemini-1.5-flash-8b"
         ];
 
         let attemptLog: string[] = [];
@@ -178,8 +176,10 @@ export async function transcribeAudio(params: TranscribeParams) {
 
     } catch (error: any) {
         console.error("Transcription error:", error);
-        // RAW ERROR FOR DEBUGGING
-        return { error: `[Server] ${error.message}` };
+        // Short error for mobile readability
+        const msg = error.message || "Error desconocido";
+        const shortMsg = msg.length > 100 ? msg.substring(0, 100) + '...' : msg;
+        return { error: shortMsg };
     } finally {
         // Clean up local temp file
         if (tempFilePath) {
