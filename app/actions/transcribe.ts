@@ -9,9 +9,6 @@ import { finished } from "stream/promises";
 import path from "path";
 import os from "os";
 
-// Allow up to 5 minutes for long audio processing on Railway
-export const maxDuration = 300;
-
 // Types
 type TranscribeParams = {
     fileBase64?: string;
