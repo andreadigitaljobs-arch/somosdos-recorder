@@ -2,9 +2,9 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'E-Education Platform',
-        short_name: 'E-Education',
-        description: 'Plataforma de estudio inteligente con IA',
+        name: 'SomosDos Recorder',
+        short_name: 'S2 Recorder',
+        description: 'Infraestructura inteligente para análisis de reuniones por SomosDos Studio',
         start_url: '/',
         display: 'standalone',
         background_color: '#ffffff',

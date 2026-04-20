@@ -22,62 +22,42 @@
 }
 
 :root {
-    --background: #ffffff;
-    --foreground: #09090b;
+    /* Deep Blue Base Theme (SomosDos Dark Mode) */
+    --background: #070b1d; /* Fondo azul profundo */
+    --foreground: #f8fafc;
 
-    /* Brand: Purple (Primary) */
-    --primary: #7c3aed;
+    /* Brand: Blue to Purple Gradient */
+    --primary: #2749d0; /* Blue from logo */
     --primary-foreground: #ffffff;
 
-    /* Brand: Green (Secondary) */
-    --secondary: #10b981;
+    --secondary: #6f2dbf; /* Purple from logo */
     --secondary-foreground: #ffffff;
 
-    --accent: #f4f4f5;
-    --accent-foreground: #09090b;
+    --accent: #1e293b; /* Slate accents */
+    --accent-foreground: #f8fafc;
 
-    --muted: #f4f4f5;
-    --muted-foreground: #71717a;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
 
-    --card: #ffffff;
-    --card-foreground: #09090b;
+    --card: #0c122e; /* Superficies azul marino */
+    --card-foreground: #f8fafc;
 
-    --popover: #ffffff;
-    --popover-foreground: #09090b;
+    --popover: #0c122e;
+    --popover-foreground: #f8fafc;
 
-    --border: #e4e4e7;
-    --input: #e4e4e7;
-    --ring: #7c3aed;
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #2749d0;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
+/* Dark mode forced/standardized for SomosDos Recorder */
+@media (prefers-color-scheme: light) {
     :root {
-        --background: #09090b;
-        --foreground: #ededed;
-
-        --primary: #8b5cf6;
-        --primary-foreground: #ffffff;
-
-        --secondary: #34d399;
-        --secondary-foreground: #09090b;
-
-        --accent: #27272a;
-        --accent-foreground: #ededed;
-
-        --muted: #27272a;
-        --muted-foreground: #a1a1aa;
-
-        --card: #09090b;
-        --card-foreground: #ededed;
-
-        --popover: #09090b;
-        --popover-foreground: #ededed;
-
-        --border: #27272a;
-        --input: #27272a;
-        --ring: #8b5cf6;
+        /* Even in light mode preference, we keep a deep professional look or slightly lighter navy */
+        --background: #0f172a;
+        --card: #1e293b;
     }
 }
 

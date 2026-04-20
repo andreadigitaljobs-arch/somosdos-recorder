@@ -8,7 +8,7 @@ import { Home, Mic, FileText, Brain } from "lucide-react"
 const navItems = [
     { name: "Inicio", href: "/dashboard", icon: Home },
     { name: "Transcriptor", href: "/transcriptor", icon: Mic },
-    { name: "Zona Quiz", href: "/quiz", icon: Brain },
+    // { name: "Zona Quiz", href: "/quiz", icon: Brain },
     { name: "Biblioteca", href: "/library", icon: FileText },
 ]
 

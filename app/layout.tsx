@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "E-Education Platform",
-  description: "Tu espacio de estudio inteligente con IA",
+  title: "SomosDos Recorder",
+  description: "Infraestructura inteligente para análisis de reuniones por SomosDos Studio",
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'E-Education',
+    title: 'SomosDos Recorder',
   },
   icons: {
     icon: '/icon.jpg',

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
 import { useTranscription, QueueItem } from "@/components/providers/transcription-provider"
+import { LiveRecorder } from "@/components/transcription/live-recorder"
 
 // Types
 type FolderItem = {
@@ -354,22 +355,22 @@ export default function TranscriptorPage() {
                 )}
             </div>
 
-            {/* Main Area: Split into Upload / Queue */}
-            <div className="flex-1 overflow-hidden flex flex-col gap-6">
-
-                {/* Upload Area (Always visible but shrinks if queue exists) */}
-                <div
-                    {...getRootProps()}
-                    className={`w-full ${queue.length > 0 ? 'h-32' : 'flex-1'} min-h-[150px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all cursor-pointer ${isDragActive ? 'border-primary bg-primary/10' : 'border-border bg-card/50 hover:bg-card/80'}`}
-                >
-                    <input {...getInputProps()} />
-                    <div className="p-3 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 mb-2 shadow-inner">
-                        <Upload className={`${queue.length > 0 ? 'h-6 w-6' : 'h-10 w-10'} text-primary`} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <LiveRecorder />
+                    
+                    {/* Upload Area (Always visible but shrinks if queue exists) */}
+                    <div
+                        {...getRootProps()}
+                        className={`w-full ${queue.length > 0 ? 'h-full' : 'flex-1'} min-h-[150px] border-2 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all cursor-pointer ${isDragActive ? 'border-primary bg-primary/10' : 'border-border/30 bg-card/20 hover:bg-card/40 hover:border-primary/20'}`}
+                    >
+                        <input {...getInputProps()} />
+                        <div className="p-3 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 mb-2 shadow-inner">
+                            <Upload className={`${queue.length > 0 ? 'h-5 w-5' : 'h-8 w-8'} text-primary`} />
+                        </div>
+                        <p className="text-sm font-medium text-center">
+                            {isDragActive ? "Suelta los archivos aquí" : "O sube archivos de audio/video"}
+                        </p>
                     </div>
-                    <p className="text-sm font-medium text-center">
-                        {isDragActive ? "Suelta los archivos aquí" : "Arrastra tus archivos de audio/video"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">Soporta múltiples archivos</p>
                 </div>
 
                 {/* Queue List */}

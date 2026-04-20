@@ -57,10 +57,10 @@ export default function LoginPage() {
                 <Card className="border-border/50 bg-card/50 backdrop-blur-xl">
                     <CardHeader className="space-y-4 text-center py-8">
                         <div className="flex justify-center mb-6">
-                            <img src="/logo_text.png" alt="E-Education" className="h-10 object-contain" />
+                            <img src="/somosdos-logo.png" alt="SomosDos Recorder" className="h-14 object-contain" />
                         </div>
                         <CardDescription>
-                            Ingresa a tu espacio de estudio profesional
+                            Accede a tu infraestructura de análisis inteligente
                         </CardDescription>
                     </CardHeader>
                     <form onSubmit={handleLogin}>
