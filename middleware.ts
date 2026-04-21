@@ -40,7 +40,11 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Protected Routes Handling
-    if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    const isProtectedRoute = 
+        request.nextUrl.pathname.startsWith("/transcriptor") || 
+        request.nextUrl.pathname.startsWith("/library")
+
+    if (isProtectedRoute) {
         if (!user) {
             return NextResponse.redirect(new URL("/login", request.url))
         }
@@ -49,7 +53,7 @@ export async function middleware(request: NextRequest) {
     // Auth Routes Handling (redirect to dashboard if already logged in)
     if (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "/login") {
         if (user) {
-            return NextResponse.redirect(new URL("/dashboard", request.url))
+            return NextResponse.redirect(new URL("/transcriptor", request.url))
         }
     }
 

@@ -1,16 +1,26 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, StopCircle, Pause, Play, Loader2, Circle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { 
+    Mic, 
+    Square, 
+    Pause, 
+    Play, 
+    Loader2, 
+    Circle, 
+    Download, 
+    Trash2, 
+    RotateCcw 
+} from "lucide-react"
 import { useTranscription } from "@/components/providers/transcription-provider"
-
 import { saveRecordingSession, deleteRecordingSession, getAllPendingRecordings, PendingRecording } from "@/lib/recorder-db"
-import { Download, Trash2, RotateCcw } from "lucide-react"
 
 export function LiveRecorder() {
-    const { addToQueue } = useTranscription()
+    const router = useRouter()
+    const { addToQueue, setIsProcessing } = useTranscription()
     const [isRecording, setIsRecording] = useState(false)
     const [isPaused, setIsPaused] = useState(false)
     const [duration, setDuration] = useState(0)
@@ -20,6 +30,7 @@ export function LiveRecorder() {
     const chunksRef = useRef<Blob[]>([])
     const timerRef = useRef<NodeJS.Timeout | null>(null)
     const sessionIdRef = useRef<string>(`rec_${Date.now()}`)
+    const [supportedMimeType, setSupportedMimeType] = useState("audio/webm")
 
     // Check for recoveries on mount
     useEffect(() => {
@@ -40,8 +51,12 @@ export function LiveRecorder() {
 
     const startRecording = async () => {
         try {
+            // Priority: audio/mp4 (Apple/Windows compatible) > audio/webm
+            const mime = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : 'audio/webm'
+            setSupportedMimeType(mime)
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            const mediaRecorder = new MediaRecorder(stream)
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: mime })
             
             mediaRecorderRef.current = mediaRecorder
             chunksRef.current = []
@@ -92,25 +107,32 @@ export function LiveRecorder() {
         const session = recording || { chunks: chunksRef.current, id: sessionIdRef.current }
         if (session.chunks.length === 0) return
 
-        const audioBlob = new Blob(session.chunks, { type: 'audio/webm' })
-        const file = new File([audioBlob], `Grabacion_${new Date().toISOString()}.webm`, { type: 'audio/webm' })
+        const audioBlob = new Blob(session.chunks, { type: supportedMimeType })
+        const ext = supportedMimeType.includes('mp4') ? 'm4a' : 'webm'
+        const file = new File([audioBlob], `Grabacion_${new Date().toISOString()}.${ext}`, { type: supportedMimeType })
         
         addToQueue([file])
+        setIsProcessing(true) // Start IA immediately
         
-        // Cleanup IndexedDB after successful dispatch to queue
-        await deleteRecordingSession(session.id)
+        // SECURITY: We NO LONGER delete from IndexedDB automatically.
+        // This ensures the audio is safe even if transcription fails.
+        // User must delete manually via the "Recovery" alert once satisfied.
         if (recording) setPendingRecovery(null)
+
+        // Navigate to transcriptor so user sees the progress
+        router.push('/transcriptor')
     }
 
     const handleDownload = (recording: PendingRecording | null = null) => {
         const session = recording || { chunks: chunksRef.current }
         if (session.chunks.length === 0) return
 
-        const audioBlob = new Blob(session.chunks, { type: 'audio/webm' })
+        const audioBlob = new Blob(session.chunks, { type: supportedMimeType })
         const url = URL.createObjectURL(audioBlob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `SomosDos_Grabacion_${new Date().toLocaleDateString()}.webm`
+        const ext = supportedMimeType.includes('mp4') ? 'm4a' : 'webm'
+        a.download = `SomosDos_Grabacion_${new Date().toLocaleDateString()}.${ext}`
         a.click()
         URL.revokeObjectURL(url)
     }
@@ -172,7 +194,7 @@ export function LiveRecorder() {
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
                 
                 <div className="flex flex-col items-center gap-6 relative z-10 w-full text-center">
-                    {!isRecording && !pendingRecovery && (
+                    {!isRecording && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -207,21 +229,24 @@ export function LiveRecorder() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-center gap-4">
+                            <div className="flex items-center justify-center gap-6">
                                 <Button
                                     onClick={togglePause}
                                     variant="outline"
                                     size="lg"
-                                    className="h-14 w-14 rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10"
+                                    className="h-14 w-14 rounded-full border-white/20 bg-white/5 hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center p-0"
                                 >
-                                    {isPaused ? <Play className="h-6 w-6 text-primary fill-primary" /> : <Pause className="h-6 w-6 text-primary fill-primary" />}
+                                    {isPaused 
+                                        ? <Play size={24} color="#ffffff" fill="#ffffff" /> 
+                                        : <Pause size={24} color="#ffffff" fill="#ffffff" />
+                                    }
                                 </Button>
                                 <Button
                                     onClick={stopRecording}
                                     size="lg"
-                                    className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30"
+                                    className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/40 transition-all active:scale-90 flex items-center justify-center p-0"
                                 >
-                                    <StopCircle className="h-8 w-8" />
+                                    <Square size={28} color="#ffffff" fill="#ffffff" />
                                 </Button>
                             </div>
                         </div>

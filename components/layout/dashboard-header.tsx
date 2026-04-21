@@ -7,16 +7,21 @@ import { SettingsDialog } from "@/components/settings-dialog"
 
 export function DashboardHeader({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     return (
-        <header className="sticky top-0 z-30 w-full bg-background/80 backdrop-blur-xl border-b border-border/50 supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center gap-2 px-10 py-3">
-                <Button variant="ghost" size="icon" onClick={onOpenSidebar} className="shrink-0 -ml-2 hover:bg-muted/50 md:hidden">
-                    <Menu className="h-6 w-6" />
-                </Button>
-                <div className="flex-1 min-w-0">
-                    <TopNav />
+        <header className="sticky top-0 z-40 w-full bg-background/40 backdrop-blur-md supports-[backdrop-filter]:bg-background/20">
+            <div className="flex items-center justify-between px-6 py-4">
+                {/* Left: Sidebar Trigger - Hidden on Mobile, handled by Bottom Dock */}
+                <div className="flex items-center md:hidden">
+                    {/* Trigger removed as per Smart Dock request */}
                 </div>
+
+                {/* Right: Settings */}
                 <div className="flex items-center gap-2">
-                    <SettingsDialog />
+                    <div className="hidden md:block">
+                        <SettingsDialog />
+                    </div>
+                    <div className="md:hidden">
+                        {/* El acceso a ajustes en móvil ahora está en el Bottom Dock */}
+                    </div>
                 </div>
             </div>
         </header>

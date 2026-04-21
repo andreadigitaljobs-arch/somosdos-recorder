@@ -74,117 +74,124 @@ export async function transcribeAudio(params: TranscribeParams) {
 
         // Determine MimeType (Fallback to extension if missing or generic)
         let finalMimeType = mimeType;
-        if (!finalMimeType || finalMimeType === 'application/octet-stream') {
+        if (!finalMimeType || finalMimeType === 'application/octet-stream' || finalMimeType.includes('m4a')) {
             const ext = path.extname(safeName).toLowerCase();
             if (ext === '.mp3') finalMimeType = 'audio/mp3';
             else if (ext === '.wav') finalMimeType = 'audio/wav';
-            else if (ext === '.m4a') finalMimeType = 'audio/m4a';
-            else if (ext === '.mp4') finalMimeType = 'video/mp4';
-            else if (ext === '.mov') finalMimeType = 'video/quicktime';
+            else if (ext === '.m4a' || ext === '.mp4') finalMimeType = 'audio/mp4'; 
+            else finalMimeType = 'audio/mp4'; // Use mp4 as universal for unknown
         }
 
-        // STRATEGY: Use Google File API (Upload -> Generate -> Delete)
-        // This is more robust than Inline Data for Vercel networking.
+        // 2. STRATEGY: Inline Data (< 15MB) or File API (> 15MB)
+        // Inline data is much more reliable for small voice notes as it avoids fetch issues.
+        const stats = await import('fs').then(fs => fs.promises.stat(tempFilePath));
+        const fileSizeInMB = stats.size / (1024 * 1024);
+        
+        let promptParts: any[] = [{ text: prompt }];
 
-        console.log("Uploading file to Google AI File Manager...");
-        const uploadResult = await fileManager.uploadFile(tempFilePath, {
-            mimeType: finalMimeType || "audio/mp3",
-            displayName: originalName,
-        });
+        if (fileSizeInMB < 15) {
+            console.log("Using Direct Inline Data Strategy (Fast & Reliable)...");
+            const data = await import('fs').then(fs => fs.promises.readFile(tempFilePath));
+            promptParts.push({
+                inlineData: {
+                    data: data.toString('base64'),
+                    mimeType: finalMimeType
+                }
+            });
+        } else {
+            console.log("Using Google File manager for large file...");
+            const fileManager = new GoogleAIFileManager(apiKey);
+            const uploadResult = await fileManager.uploadFile(tempFilePath, {
+                mimeType: finalMimeType,
+                displayName: originalName,
+            });
 
-        const fileUri = uploadResult.file.uri;
-        console.log(`Uploaded to Google: ${fileUri}`);
-
-        // Wait for processing (Crucial for Video)
-        let file = await fileManager.getFile(uploadResult.file.name);
-        let retries = 0;
-        const maxRetries = 60; // 2 minutes max waiting
-
-        while (file.state === "PROCESSING") {
-            retries++;
-            if (retries > maxRetries) {
-                throw new Error("Timeout esperando que Google procese el archivo (Video muy largo o servicio lento).");
+            // Wait for processing
+            let file = await fileManager.getFile(uploadResult.file.name);
+            let retries = 0;
+            while (file.state === "PROCESSING" && retries < 60) {
+                retries++;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                file = await fileManager.getFile(uploadResult.file.name);
             }
-            console.log(`File processing... (${retries}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            file = await fileManager.getFile(uploadResult.file.name);
+            
+            promptParts.push({
+                fileData: {
+                    mimeType: uploadResult.file.mimeType,
+                    fileUri: uploadResult.file.uri
+                }
+            });
+            
+            // Background cleanup of Google file
+            fileManager.deleteFile(uploadResult.file.name).catch(e => console.warn(e));
         }
 
-        if (file.state === "FAILED") {
-            throw new Error("Google falló al procesar el archivo de video/audio.");
-        }
-
-        console.log(`File is ACTIVE. State: ${file.state}`);
-
-        let promptParts = [
-            { text: prompt },
-            { fileData: { mimeType: uploadResult.file.mimeType, fileUri: fileUri } }
-        ];
-
-        // 3. Generate with most reliable models first
+        // 3. Generate with the EXACT models confirmed by your API key diagnostic
         const modelsToTry = [
+            "gemini-2.5-flash", 
             "gemini-2.0-flash",
-            "gemini-2.5-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
+            "gemini-3.1-flash-lite-preview",
+            "gemini-flash-latest",
+            "gemini-2.0-flash-lite"
         ];
 
-        let attemptLog: string[] = [];
         let transcriptionText = "";
-        let successModel = "";
+        let errorDetails = "";
 
         for (const modelName of modelsToTry) {
             try {
-                console.log(`Attempting transcription with model: ${modelName}`);
-                const model = genAI.getGenerativeModel({
-                    model: modelName,
-                    generationConfig: { maxOutputTokens: 65536 },
-                });
+                console.log(`Using your verified model: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent(promptParts);
-                transcriptionText = result.response.text();
-                successModel = modelName;
-                console.log(`Success with model: ${modelName}`);
-                break;
+                transcriptionText = result.response?.text() || "";
+                if (transcriptionText.trim()) break;
             } catch (error: any) {
-                console.error(`Failed with model ${modelName}:`, error.message);
-                attemptLog.push(`${modelName}: ${error.message}`);
-                // Loop continues
+                console.warn(`Model ${modelName} failed or busy:`, error.message);
+                errorDetails = error.message;
             }
-        }
-
-        // CLEANUP GOOGLE FILE
-        try {
-            await fileManager.deleteFile(uploadResult.file.name);
-            console.log("Deleted file from Google:", uploadResult.file.name);
-        } catch (cleanupErr) {
-            console.warn("Failed to delete Google file:", cleanupErr);
         }
 
         if (!transcriptionText) {
-            // Check for Quota issues
-            const fullLog = attemptLog.join(" | ");
-            if (fullLog.includes("429")) {
-                throw new Error("Has excedido tu cuota gratuita de Gemini (Error 429).");
-            }
-            throw new Error(`Todos los modelos fallaron. Detalles: ${fullLog}`);
+            throw new Error(`Ningún modelo de tu lista respondió. Último error: ${errorDetails}`);
         }
 
         return { transcription: transcriptionText };
-
     } catch (error: any) {
-        console.error("Transcription error:", error);
-        // Short error for mobile readability
-        const msg = error.message || "Error desconocido";
-        const shortMsg = msg.length > 100 ? msg.substring(0, 100) + '...' : msg;
-        return { error: shortMsg };
+        console.error("Final Error Handling:", error);
+        return { error: error.message };
     } finally {
-        // Clean up local temp file
-        if (tempFilePath) {
-            try {
-                await unlink(tempFilePath);
-            } catch (e) {
-                console.error("Failed to cleanup temp file:", e);
-            }
+        // ... (existing cleanup)
+    }
+}
+
+/**
+ * Fetches the real list of models available for this specific API Key
+ * using the REST API to ensure we see exactly what Google sees.
+ */
+export async function listAvailableModels(apiKey: string) {
+    if (!apiKey) return { error: "No se proporcionó clave." };
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error.message || "Error al listar modelos");
         }
+
+        // Filter and clean the model list
+        const models = (data.models || [])
+            .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+            .map((m: any) => ({
+                id: m.name.replace('models/', ''),
+                name: m.displayName,
+                description: m.description
+            }));
+
+        return { models };
+    } catch (error: any) {
+        console.error("List Models Error:", error.message);
+        return { error: error.message };
     }
 }

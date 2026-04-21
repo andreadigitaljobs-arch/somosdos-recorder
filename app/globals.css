@@ -78,15 +78,38 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Custom Premium Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(39, 73, 208, 0.2); /* Primary transparent */
+    border-radius: 10px;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(39, 73, 208, 0.5); /* Stronger on hover */
+}
+
+/* For Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(39, 73, 208, 0.2) transparent;
+}
+
 /* Utility to hide scrollbar while keeping functionality */
 .scrollbar-hide {
-    -ms-overflow-style: none;
-    /* IE and Edge */
-    scrollbar-width: none;
-    /* Firefox */
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-    /* Chrome, Safari and Opera */
+    display: none !important;
 }

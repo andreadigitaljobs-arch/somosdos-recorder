@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, LogOut, Plus, Layers, Key, User, MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { X, LogOut, Plus, Layers, Key, User, MoreVertical, Pencil, Trash2, Mic, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
@@ -34,9 +35,11 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
 
-    const [email, setEmail] = useState("usuario@demo.com")
+    const supabase = createClient()
     const { spaces, currentSpace, setCurrentSpace, refreshSpaces } = useSpace()
     const router = useRouter()
+    const pathname = usePathname()
+    const [email, setEmail] = useState("usuario@demo.com")
 
     // Space Management State
     const [isRenameOpen, setIsRenameOpen] = useState(false)
@@ -87,7 +90,7 @@ export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
         setIsRenameOpen(true)
     }
 
-    const supabase = createClient()
+
 
     useEffect(() => {
         // Determine user (mock for now if not logged in, but try to get session)
@@ -126,7 +129,27 @@ export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
+                {/* Main Navigation (Desktop Visible) */}
+                <div className="space-y-1.5 px-1">
+                    <button
+                        onClick={() => router.push('/transcriptor')}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${pathname === '/transcriptor' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}`}
+                    >
+                        <Mic className="h-4 w-4" />
+                        Grabadora
+                    </button>
+                    <button
+                        onClick={() => router.push('/library')}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${pathname === '/library' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'}`}
+                    >
+                        <FileText className="h-4 w-4" />
+                        Biblioteca
+                    </button>
+                </div>
+
+                <div className="border-b border-border/30 my-2" />
+
                 {/* User Info */}
                 <div className="space-y-3">
                     <div className="flex items-center gap-3 text-muted-foreground">
