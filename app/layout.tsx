@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     title: 'SomosDos Recorder',
   },
   icons: {
-    icon: '/icon.jpg',
-    apple: '/icon.jpg',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
   formatDetection: {
     telephone: false,
