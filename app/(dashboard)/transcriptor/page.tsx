@@ -463,7 +463,6 @@ export default function TranscriptorPage() {
                         </div>
                     </div>
                 )}
-            </div>
 
             {/* Save Modal */}
             {isSaveModalOpen && (

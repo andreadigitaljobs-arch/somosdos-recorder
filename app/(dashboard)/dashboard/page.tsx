@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Folder, Mic, Brain, Activity, Clock } from "lucide-react"
+import { FileText, Folder, Mic, Brain, Activity, Clock, Circle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
+import { Button } from "@/components/ui/button"
+import { LiveRecorder } from "@/components/transcription/live-recorder"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 
