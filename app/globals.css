@@ -23,42 +23,52 @@
 
 :root {
     /* Deep Blue Base Theme (SomosDos Dark Mode) */
-    --background: #070b1d; /* Fondo azul profundo */
+    --background: #070b1d; /* Deep navy */
     --foreground: #f8fafc;
 
     /* Brand: Blue to Purple Gradient */
-    --primary: #2749d0; /* Blue from logo */
+    --primary: #2749d0; /* Electric Blue */
     --primary-foreground: #ffffff;
 
-    --secondary: #6f2dbf; /* Purple from logo */
+    --secondary: #6f2dbf; /* Vibrant Purple */
     --secondary-foreground: #ffffff;
 
-    --accent: #1e293b; /* Slate accents */
+    --accent: #111a3d; /* Lighter navy for hover states */
     --accent-foreground: #f8fafc;
 
-    --muted: #1e293b;
+    --muted: #131c42;
     --muted-foreground: #94a3b8;
 
-    --card: #0c122e; /* Superficies azul marino */
+    --card: rgba(12, 18, 46, 0.6); /* Translucent navy for glass effect */
     --card-foreground: #f8fafc;
 
     --popover: #0c122e;
     --popover-foreground: #f8fafc;
 
-    --border: #1e293b;
-    --input: #1e293b;
+    --border: rgba(39, 73, 208, 0.2); /* Subtle blue border */
+    --input: #131c42;
     --ring: #2749d0;
 
-    --radius: 1rem;
+    --radius: 1.25rem;
 }
 
-/* Dark mode forced/standardized for SomosDos Recorder */
-@media (prefers-color-scheme: light) {
-    :root {
-        /* Even in light mode preference, we keep a deep professional look or slightly lighter navy */
-        --background: #0f172a;
-        --card: #1e293b;
-    }
+/* Glassmorphism Utility */
+.glass {
+    background: rgba(12, 18, 46, 0.4);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+    background: linear-gradient(135deg, rgba(39, 73, 208, 0.1), rgba(111, 45, 191, 0.1));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Force Dark Mode for SomosDos */
+:root {
+    color-scheme: dark;
 }
 
 body {

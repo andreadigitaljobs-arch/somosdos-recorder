@@ -111,7 +111,7 @@ export function Sidebar({ isOpen, onClose, isDesktop = false }: SidebarProps) {
             <div className="flex items-center justify-between p-4 border-b border-border/50">
                 <div className="relative w-full h-8">
                     <Image
-                        src="/somosdos-logo.png"
+                        src="/logo.png"
                         alt="SomosDos Recorder Logo"
                         fill
                         className="object-contain object-center"

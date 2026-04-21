@@ -57,7 +57,7 @@ export default function LoginPage() {
                 <Card className="border-border/50 bg-card/50 backdrop-blur-xl">
                     <CardHeader className="space-y-4 text-center py-8">
                         <div className="flex justify-center mb-6">
-                            <img src="/somosdos-logo.png" alt="SomosDos Recorder" className="h-14 object-contain" />
+                            <img src="/logo.png" alt="SomosDos Recorder" className="h-14 object-contain" />
                         </div>
                         <CardDescription>
                             Accede a tu infraestructura de análisis inteligente

@@ -24,30 +24,21 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [activities, setActivities] = useState<ActivityItem[]>([])
     const [counts, setCounts] = useState({
-        files: 0,
-        folders: 0,
         transcriptions: 0,
-        quizzes: 0
+        files: 0
     })
 
     useEffect(() => {
-        async function fetchCounts() {
+        async function fetchStats() {
             if (!currentSpace) return
             setLoading(true)
 
             try {
-                // 1. Files & Folders
+                // 1. Files
                 const { count: filesCount } = await supabase
                     .from('files')
                     .select('*', { count: 'exact', head: true })
                     .eq('space_id', currentSpace.id)
-                    .eq('type', 'file')
-
-                const { count: foldersCount } = await supabase
-                    .from('files')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('space_id', currentSpace.id)
-                    .eq('type', 'folder')
 
                 // 2. Transcriptions
                 const { count: transcriptionsCount } = await supabase
@@ -57,12 +48,10 @@ export default function DashboardPage() {
 
                 setCounts({
                     files: filesCount || 0,
-                    folders: foldersCount || 0,
-                    transcriptions: transcriptionsCount || 0,
-                    quizzes: 0 // Hidden
+                    transcriptions: transcriptionsCount || 0
                 })
 
-                // 3. Recent Activity Feed (Filtered to Transcriptions ONLY)
+                // 3. Recent Transcriptions Activity
                 const { data: recentTranscriptions } = await supabase
                     .from('transcriptions')
                     .select('id, created_at, metadata')
@@ -79,7 +68,7 @@ export default function DashboardPage() {
                         icon: Mic,
                         color: "text-primary bg-primary/10"
                     }))
-                ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                ]
 
                 setActivities(unifiedActivity)
 
@@ -89,101 +78,118 @@ export default function DashboardPage() {
                 setLoading(false)
             }
         }
-        fetchCounts()
+        fetchStats()
     }, [currentSpace, supabase])
 
-
-    const stats = [
-        { title: "Archivos", value: counts.files, icon: FileText, color: "text-blue-500" },
-        { title: "Carpetas", value: counts.folders, icon: Folder, color: "text-yellow-500" },
-        { title: "Transcripciones", value: counts.transcriptions, icon: Mic, color: "text-primary" },
-    ]
-
     return (
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground/90 font-sans">Inicio</h2>
+        <div className="space-y-8 pb-12">
+            <header className="flex flex-col gap-2">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground/90 font-sans">
+                    Bienvenido a <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">SomosDos Recorder</span>
+                </h2>
+                <p className="text-muted-foreground text-sm">Tu centro de mando para capturas e inteligencia de audio.</p>
+            </header>
 
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {stats.map((stat) => (
-                    <Card key={stat.title} className="bg-card/40 border-primary/10 backdrop-blur-sm shadow-xl">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                {stat.title}
-                            </CardTitle>
-                            <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                        </CardHeader>
-                        <CardContent className="p-4 pt-0">
-                            <div className="text-2xl font-bold text-foreground">
-                                {loading ? (
-                                    <div className="h-6 w-12 bg-primary/10 animate-pulse rounded-md" />
-                                ) : (
-                                    stat.value
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            {/* Main Action Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <div className="space-y-6">
+                    {/* Live Recorder Component */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 px-1 text-xs font-bold uppercase tracking-widest text-primary/70">
+                            <Circle className="h-3 w-3 fill-primary animate-pulse" />
+                            Grabación en Directo
+                        </div>
+                        <LiveRecorder />
+                    </div>
 
-            {/* Dashboard Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Recent Activity */}
-                <Card className="lg:col-span-2 border-border/50 bg-card/30 backdrop-blur-md">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">Actividad Reciente</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className="h-12 w-full bg-accent/10 animate-pulse rounded-md" />
-                                ))}
-                            </div>
-                        ) : activities.length === 0 ? (
-                            <div className="h-[200px] w-full flex items-center justify-center bg-accent/20 rounded-lg border border-dashed border-border/60">
-                                <div className="text-center text-muted-foreground">
-                                    <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                    <span className="text-sm">Sin actividad reciente</span>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <Card className="glass border-primary/20">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-primary/10">
+                                        <Mic className="h-6 w-6 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Transcripciones</p>
+                                        <p className="text-2xl font-bold">{loading ? "..." : counts.transcriptions}</p>
+                                    </div>
                                 </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="glass border-secondary/20">
+                            <CardContent className="p-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-2xl bg-secondary/10">
+                                        <FileText className="h-6 w-6 text-secondary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Archivos</p>
+                                        <p className="text-2xl font-bold">{loading ? "..." : counts.files}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                {/* Right Column: Recent Activity & secondary actions */}
+                <div className="space-y-6">
+                    <Card className="border-border/50 bg-card/10 backdrop-blur-md">
+                        <CardHeader className="pb-4 border-b border-border/30">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-muted-foreground" />
+                                    Historial Reciente
+                                </CardTitle>
+                                <a href="/library" className="text-xs text-primary hover:underline font-medium">Ver Biblioteca</a>
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {activities.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-accent/40 transition-colors group">
-                                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <div className={`p-2 rounded-full ${item.color}`}>
-                                                <item.icon className="h-4 w-4" />
-                                            </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-sm font-medium leading-none truncate" title={item.title}>{item.title}</span>
-                                                <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })}
-                                                </span>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            {loading ? (
+                                <div className="space-y-4">
+                                    {[1, 2, 3].map(i => (
+                                        <div key={i} className="h-14 w-full bg-accent/5 animate-pulse rounded-2xl" />
+                                    ))}
+                                </div>
+                            ) : activities.length === 0 ? (
+                                <div className="h-[200px] w-full flex flex-col items-center justify-center bg-accent/5 rounded-2xl border border-dashed border-border/30 gap-3">
+                                    <Activity className="h-8 w-8 text-muted-foreground/30" />
+                                    <span className="text-sm text-muted-foreground">Aún no hay transcripciones</span>
+                                    <Button variant="outline" size="sm" onClick={() => window.location.href = '/transcriptor'}>Empezar ahora</Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activities.map((item) => (
+                                        <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl border border-border/20 bg-card/20 hover:bg-accent/10 transition-all group cursor-pointer" onClick={() => window.location.href = `/library?id=${item.id}`}>
+                                            <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                <div className={`p-2.5 rounded-xl ${item.color}`}>
+                                                    <item.icon className="h-4 w-4" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{item.title}</span>
+                                                    <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                                                        {formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 gap-4">
-                    <Card className="bg-gradient-to-br from-primary/20 to-secondary/20 border-primary/20 shadow-2xl">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">Acceso Rápido</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-3">
-                            <a href="/transcriptor" className="flex flex-col items-center justify-center p-6 bg-background/40 rounded-2xl border border-primary/10 hover:bg-background/60 transition-all hover:scale-[1.02] active:scale-95 group">
-                                <div className="p-3 rounded-full bg-primary/20 mb-3 group-hover:scale-110 transition-transform">
-                                    <Mic className="h-6 w-6 text-primary" />
+                                    ))}
                                 </div>
-                                <span className="text-sm font-semibold text-primary">Transcribir Grabación</span>
-                                <span className="text-[10px] text-muted-foreground mt-1 text-center">Inicia una nueva grabación o sube un archivo</span>
-                            </a>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 overflow-hidden relative group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Brain className="h-24 w-24" />
+                        </div>
+                        <CardContent className="p-6">
+                            <h4 className="font-bold text-foreground mb-1">Análisis Pro</h4>
+                            <p className="text-xs text-muted-foreground mb-4">Sube archivos existentes para un análisis profundo con IA.</p>
+                            <Button className="w-full bg-background/50 hover:bg-background/80 text-foreground border-border/50" onClick={() => window.location.href = '/transcriptor'}>
+                                Ir al Transcriptor
+                            </Button>
                         </CardContent>
                     </Card>
                 </div>

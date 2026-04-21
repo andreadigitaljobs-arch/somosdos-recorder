@@ -6,17 +6,32 @@ import { Mic, StopCircle, Pause, Play, Loader2, Circle } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTranscription } from "@/components/providers/transcription-provider"
 
+import { saveRecordingSession, deleteRecordingSession, getAllPendingRecordings, PendingRecording } from "@/lib/recorder-db"
+import { Download, Trash2, RotateCcw } from "lucide-react"
+
 export function LiveRecorder() {
     const { addToQueue } = useTranscription()
     const [isRecording, setIsRecording] = useState(false)
     const [isPaused, setIsPaused] = useState(false)
     const [duration, setDuration] = useState(0)
+    const [pendingRecovery, setPendingRecovery] = useState<PendingRecording | null>(null)
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
     const timerRef = useRef<NodeJS.Timeout | null>(null)
+    const sessionIdRef = useRef<string>(`rec_${Date.now()}`)
 
-    // Format duration to MM:SS
+    // Check for recoveries on mount
+    useEffect(() => {
+        async function checkRecoveries() {
+            const pending = await getAllPendingRecordings()
+            if (pending.length > 0) {
+                setPendingRecovery(pending[0]) // Show most recent recovery
+            }
+        }
+        checkRecoveries()
+    }, [])
+
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60)
         const secs = seconds % 60
@@ -30,26 +45,25 @@ export function LiveRecorder() {
             
             mediaRecorderRef.current = mediaRecorder
             chunksRef.current = []
+            sessionIdRef.current = `rec_${Date.now()}`
 
-            mediaRecorder.ondataavailable = (e) => {
+            mediaRecorder.ondataavailable = async (e) => {
                 if (e.data.size > 0) {
                     chunksRef.current.push(e.data)
+                    // PERSISTENCE: Save to IndexedDB on every chunk
+                    await saveRecordingSession({
+                        id: sessionIdRef.current,
+                        timestamp: Date.now(),
+                        chunks: chunksRef.current
+                    })
                 }
             }
 
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' })
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-                const file = new File([audioBlob], `Grabacion_${timestamp}.webm`, { type: 'audio/webm' })
-                
-                // Feed into the existing transcription queue
-                addToQueue([file])
-                
-                // Stop all tracks in the stream
                 stream.getTracks().forEach(track => track.stop())
             }
 
-            mediaRecorder.start()
+            mediaRecorder.start(3000) // Chunk every 3 seconds for safety
             setIsRecording(true)
             setIsPaused(false)
             setDuration(0)
@@ -60,7 +74,7 @@ export function LiveRecorder() {
 
         } catch (err) {
             console.error("Error starting recording:", err)
-            alert("No se pudo acceder al micrófono. Por favor verifica los permisos.")
+            alert("No se pudo acceder al micrófono.")
         }
     }
 
@@ -70,6 +84,42 @@ export function LiveRecorder() {
             setIsRecording(false)
             setIsPaused(false)
             if (timerRef.current) clearInterval(timerRef.current)
+            // Note: Data is already in IndexedDB thanks to ondataavailable
+        }
+    }
+
+    const handleTranscription = async (recording: PendingRecording | null = null) => {
+        const session = recording || { chunks: chunksRef.current, id: sessionIdRef.current }
+        if (session.chunks.length === 0) return
+
+        const audioBlob = new Blob(session.chunks, { type: 'audio/webm' })
+        const file = new File([audioBlob], `Grabacion_${new Date().toISOString()}.webm`, { type: 'audio/webm' })
+        
+        addToQueue([file])
+        
+        // Cleanup IndexedDB after successful dispatch to queue
+        await deleteRecordingSession(session.id)
+        if (recording) setPendingRecovery(null)
+    }
+
+    const handleDownload = (recording: PendingRecording | null = null) => {
+        const session = recording || { chunks: chunksRef.current }
+        if (session.chunks.length === 0) return
+
+        const audioBlob = new Blob(session.chunks, { type: 'audio/webm' })
+        const url = URL.createObjectURL(audioBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `SomosDos_Grabacion_${new Date().toLocaleDateString()}.webm`
+        a.click()
+        URL.revokeObjectURL(url)
+    }
+
+    const discardRecording = async (id: string) => {
+        if (confirm("¿Estás seguro de descartar esta grabación? No se podrá recuperar.")) {
+            await deleteRecordingSession(id)
+            setPendingRecovery(null)
+            if (!isRecording) chunksRef.current = []
         }
     }
 
@@ -88,92 +138,119 @@ export function LiveRecorder() {
         }
     }
 
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) clearInterval(timerRef.current)
-        }
-    }, [])
-
     return (
-        <div className="w-full p-6 rounded-3xl bg-card/40 border border-primary/20 backdrop-blur-xl shadow-2xl relative overflow-hidden group transition-all hover:border-primary/40">
-            {/* Background Glow */}
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-500" />
-            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-secondary/10 rounded-full blur-3xl group-hover:bg-secondary/20 transition-all duration-500" />
+        <div className="flex flex-col gap-4">
+            {/* Recovery Alert */}
+            <AnimatePresence>
+                {pendingRecovery && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="glass-card p-4 rounded-2xl border-amber-500/30 bg-amber-500/5 flex items-center justify-between gap-4"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-500/20 rounded-full">
+                                <RotateCcw className="h-4 w-4 text-amber-500" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-amber-500 uppercase tracking-tighter">Grabación Recuperada</p>
+                                <p className="text-[10px] text-muted-foreground">{new Date(pendingRecovery.timestamp).toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="h-8 text-[10px] border-amber-500/20" onClick={() => handleDownload(pendingRecovery)}>Descargar</Button>
+                            <Button size="sm" className="h-8 text-[10px] bg-amber-600 hover:bg-amber-700" onClick={() => handleTranscription(pendingRecovery)}>Transcribir</Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => discardRecording(pendingRecovery.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            <div className="flex flex-col items-center gap-6 relative z-10">
-                <div className="flex flex-col items-center gap-2">
-                    <h3 className="text-lg font-semibold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                        Grabación en Vivo
-                    </h3>
-                    <p className="text-xs text-muted-foreground">Tu audio se transcribirá automáticamente al finalizar</p>
-                </div>
-
-                <div className="flex items-center justify-center gap-8 py-2">
-                    <AnimatePresence mode="wait">
-                        {!isRecording ? (
-                            <motion.div
-                                key="start"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                            >
+            {/* Main Recorder Card */}
+            <div className="w-full p-8 rounded-[2rem] glass border-primary/20 shadow-2xl relative overflow-hidden group transition-all hover:border-primary/40 min-h-[220px] flex flex-col items-center justify-center">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                
+                <div className="flex flex-col items-center gap-6 relative z-10 w-full text-center">
+                    {!isRecording && !pendingRecovery && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="space-y-4"
+                        >
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-primary to-secondary p-[2px] mx-auto group-hover:scale-105 transition-transform duration-500">
                                 <Button
                                     onClick={startRecording}
-                                    size="lg"
-                                    className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30 group/btn"
+                                    className="w-full h-full rounded-full bg-card hover:bg-transparent transition-colors flex items-center justify-center p-0"
                                 >
-                                    <Mic className="h-8 w-8 group-hover/btn:scale-110 transition-transform" />
+                                    <Mic className="h-8 w-8 text-foreground group-hover:text-white transition-colors" />
                                 </Button>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="recording"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                className="flex items-center gap-6"
-                            >
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="text-3xl font-mono font-bold tracking-wider text-primary drop-shadow-[0_0_10px_rgba(39,73,208,0.5)]">
-                                        {formatTime(duration)}
-                                    </div>
-                                    <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
-                                        <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-red-500 animate-pulse'}`} />
-                                        <span className="text-[10px] uppercase font-bold tracking-widest">
-                                            {isPaused ? 'En Pausa' : 'Grabando'}
-                                        </span>
-                                    </div>
-                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold">Iniciar Nueva Grabación</h3>
+                                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">Tus sesiones se guardan localmente para evitar pérdidas.</p>
+                            </div>
+                        </motion.div>
+                    )}
 
-                                <div className="flex gap-3">
-                                    <Button
-                                        onClick={togglePause}
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-12 w-12 rounded-full border-primary/20 hover:bg-primary/10"
-                                    >
-                                        {isPaused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
-                                    </Button>
-                                    <Button
-                                        onClick={stopRecording}
-                                        variant="destructive"
-                                        size="icon"
-                                        className="h-12 w-12 rounded-full shadow-lg shadow-destructive/20"
-                                    >
-                                        <StopCircle className="h-6 w-6" />
-                                    </Button>
+                    {isRecording && (
+                        <div className="w-full space-y-6">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="text-5xl font-mono font-black tracking-tighter text-foreground drop-shadow-[0_0_15px_rgba(39,73,208,0.3)]">
+                                    {formatTime(duration)}
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                <div className="flex items-center gap-2 px-3 py-1 bg-background/50 rounded-full border border-border/50">
+                                    <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-red-500 animate-pulse'}`} />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-foreground/70">
+                                        {isPaused ? 'En Pausa' : 'Grabando'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-center gap-4">
+                                <Button
+                                    onClick={togglePause}
+                                    variant="outline"
+                                    size="lg"
+                                    className="h-14 w-14 rounded-full border-primary/20 bg-primary/5 hover:bg-primary/10"
+                                >
+                                    {isPaused ? <Play className="h-6 w-6 text-primary fill-primary" /> : <Pause className="h-6 w-6 text-primary fill-primary" />}
+                                </Button>
+                                <Button
+                                    onClick={stopRecording}
+                                    size="lg"
+                                    className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30"
+                                >
+                                    <StopCircle className="h-8 w-8" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!isRecording && chunksRef.current.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="w-full space-y-4"
+                        >
+                            <p className="text-xs font-bold text-primary uppercase tracking-widest italic">Grabación Finalizada</p>
+                            <div className="flex gap-3 justify-center">
+                                <Button variant="outline" className="gap-2 rounded-2xl h-12" onClick={() => handleDownload()}>
+                                    <Download className="h-4 w-4" /> Descargar
+                                </Button>
+                                <Button className="gap-2 rounded-2xl h-12 px-8 bg-gradient-to-r from-primary to-secondary" onClick={() => handleTranscription()}>
+                                    Transcribir con IA
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl hover:bg-destructive/10 hover:text-destructive" onClick={() => discardRecording(sessionIdRef.current)}>
+                                    <Trash2 className="h-5 w-5" />
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
                 </div>
-
-                {!isRecording && (
-                    <div className="px-4 py-2 bg-accent/30 rounded-2xl border border-border/50 text-[10px] font-medium text-muted-foreground">
-                        LISTO PARA CAPTURAR
-                    </div>
-                )}
             </div>
         </div>
+    )
+}
     )
 }
