@@ -30,6 +30,10 @@ const SpaceContext = createContext<SpaceContextType>({
     setCurrentSpace: () => { },
     refreshSpaces: async () => { },
     loading: true,
+    handleCreateSpace: async () => { },
+    newSpaceName: "",
+    setNewSpaceName: () => { },
+    creating: false,
 })
 
 export const useSpace = () => useContext(SpaceContext)
