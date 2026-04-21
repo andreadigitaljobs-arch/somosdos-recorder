@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { AlertCircle, CheckCircle, Clock, Copy, Eye, Loader2, Play, Save, Upload, X, Folder, FolderPlus, Search, Pencil, Download, Mic, Circle } from 'lucide-react'
+import { AlertCircle, CheckCircle, Clock, Eye, Loader2, Save, Upload, X, Folder, Mic, Circle } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
 import { useSpace } from "@/components/providers/space-provider"
@@ -36,7 +36,6 @@ export default function TranscriptorPage() {
     const [showToast, setShowToast] = useState(false)
     const [toastStatus, setToastStatus] = useState<'loading' | 'success' | 'error'>('loading')
     const [toastMessage, setToastMessage] = useState("")
-    const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date())
     const [loadingFolders, setLoadingFolders] = useState(false)
     
     // --- History State ---
@@ -46,7 +45,6 @@ export default function TranscriptorPage() {
     // --- Folder Creation/Search ---
     const [isCreatingFolder, setIsCreatingFolder] = useState(false)
     const [newFolderName, setNewFolderName] = useState("")
-    const [folderSearchQuery, setFolderSearchQuery] = useState("")
 
     // --- Preview/Edit State ---
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
@@ -92,7 +90,6 @@ export default function TranscriptorPage() {
                 .order('name', { ascending: true })
             if (error) throw error
             setFolders(data || [])
-            setLastRefreshed(new Date())
         } catch (e) {
             console.error(e)
         } finally {
@@ -177,13 +174,16 @@ export default function TranscriptorPage() {
         if (!newFolderName || !currentSpace) return
         setLoadingFolders(true)
         try {
-            const { data: user } = await supabase.auth.getUser()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error("No autenticado")
+            
             const { data, error } = await supabase.from('files').insert({
-                user_id: user.data.user?.id,
+                user_id: user.id,
                 space_id: currentSpace.id,
                 name: newFolderName,
                 type: 'folder'
             }).select().single()
+            
             if (error) throw error
             await fetchFolders()
             if (data) setSelectedFolderId(data.id)
