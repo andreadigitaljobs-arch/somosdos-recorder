@@ -19,6 +19,7 @@ type SpaceContextType = {
     refreshSpaces: () => Promise<void>
     loading: boolean
     handleCreateSpace: () => Promise<void>
+    handleUpdateSpace: (id: string, name: string) => Promise<void>
     newSpaceName: string
     setNewSpaceName: (name: string) => void
     creating: boolean
@@ -31,6 +32,7 @@ const SpaceContext = createContext<SpaceContextType>({
     refreshSpaces: async () => { },
     loading: true,
     handleCreateSpace: async () => { },
+    handleUpdateSpace: async () => { },
     newSpaceName: "",
     setNewSpaceName: () => { },
     creating: false,
@@ -146,6 +148,16 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         setNewSpaceName("")
     }
 
+    const handleUpdateSpace = async (id: string, name: string) => {
+        const { error } = await supabase.from('spaces').update({ name }).eq('id', id);
+        if (!error) {
+            setSpaces(spaces.map(s => s.id === id ? { ...s, name } : s));
+            if (currentSpace?.id === id) {
+                _setCurrentSpace({ ...currentSpace, name });
+            }
+        }
+    };
+
     return (
         <SpaceContext.Provider value={{ 
             spaces, 
@@ -154,6 +166,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
             refreshSpaces: fetchSpaces, 
             loading,
             handleCreateSpace,
+            handleUpdateSpace,
             newSpaceName,
             setNewSpaceName,
             creating

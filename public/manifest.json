@@ -1,0 +1,27 @@
+{
+  "name": "SomosDos Recorder",
+  "short_name": "SomosDos",
+  "description": "Infraestructura inteligente para análisis de reuniones por SomosDos Studio",
+  "start_url": "/transcriptor",
+  "display": "standalone",
+  "background_color": "#070b1d",
+  "theme_color": "#2749d0",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

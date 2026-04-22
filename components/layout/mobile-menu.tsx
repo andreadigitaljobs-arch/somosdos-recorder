@@ -16,10 +16,20 @@ interface MobileMenuProps {
 }
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
-    const { spaces, currentSpace, setCurrentSpace } = useSpace()
+    const { spaces, currentSpace, setCurrentSpace, handleUpdateSpace } = useSpace()
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const supabase = createClient()
     const router = useRouter()
+
+    // Space Editing State
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editText, setEditText] = useState("")
+
+    const handleSaveRename = async (id: string) => {
+        if (!editText.trim()) return
+        await handleUpdateSpace(id, editText.trim())
+        setEditingId(null)
+    }
 
     // Settings State
     const [showSettings, setShowSettings] = useState(false)
@@ -124,25 +134,72 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                                         </div>
                                         <div className="grid grid-cols-1 gap-2">
                                             {spaces.map(space => (
-                                                <button
-                                                    key={space.id}
-                                                    onClick={() => {
-                                                        setCurrentSpace(space)
-                                                        onClose()
-                                                    }}
-                                                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                                                        currentSpace?.id === space.id 
-                                                        ? 'bg-primary/20 border-primary' 
-                                                        : 'bg-white/5 border-white/5'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <LayoutGrid className={`h-4 w-4 ${currentSpace?.id === space.id ? 'text-primary' : 'text-muted-foreground'}`} />
-                                                        <span className={`text-sm font-semibold ${currentSpace?.id === space.id ? 'text-white' : 'text-muted-foreground'}`}>
-                                                            {space.name}
-                                                        </span>
-                                                    </div>
-                                                </button>
+                                                <div key={space.id} className="relative group">
+                                                    {editingId === space.id ? (
+                                                        <motion.div 
+                                                            initial={{ opacity: 0, x: -10 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            className="flex items-center gap-2 p-2 bg-primary/10 rounded-2xl border border-primary/30"
+                                                        >
+                                                            <Input 
+                                                                autoFocus
+                                                                value={editText}
+                                                                onChange={(e) => setEditText(e.target.value)}
+                                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveRename(space.id)}
+                                                                className="h-10 bg-transparent border-none text-sm placeholder:text-white/20 focus-visible:ring-0"
+                                                            />
+                                                            <div className="flex gap-1 pr-1">
+                                                                <Button 
+                                                                    size="icon" 
+                                                                    className="h-8 w-8 rounded-lg bg-green-500 hover:bg-green-600"
+                                                                    onClick={() => handleSaveRename(space.id)}
+                                                                >
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button 
+                                                                    size="icon" 
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 rounded-lg text-white/50"
+                                                                    onClick={() => setEditingId(null)}
+                                                                >
+                                                                    <X className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </motion.div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {
+                                                                setCurrentSpace(space)
+                                                                onClose()
+                                                            }}
+                                                            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                                                                currentSpace?.id === space.id 
+                                                                ? 'bg-primary/20 border-primary shadow-[0_0_20px_rgba(39,73,208,0.2)]' 
+                                                                : 'bg-white/5 border-white/5'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <LayoutGrid className={`h-4 w-4 ${currentSpace?.id === space.id ? 'text-primary' : 'text-muted-foreground'}`} />
+                                                                <span className={`text-sm font-semibold ${currentSpace?.id === space.id ? 'text-white' : 'text-muted-foreground'}`}>
+                                                                    {space.name}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className={`h-8 w-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${currentSpace?.id === space.id ? 'text-primary' : 'text-muted-foreground'}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingId(space.id);
+                                                                    setEditText(space.name);
+                                                                }}
+                                                            >
+                                                                <Settings className="h-3 w-3" />
+                                                            </Button>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
